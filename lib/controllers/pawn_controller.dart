@@ -84,18 +84,19 @@ class PawnController {
     startSquare.addPawn(pawn);
 
     if (killResult.killedOpponent) {
-      return killResult;
+      return MoveResult.entered(killedOpponent: true, victims: killResult.victims);
     }
 
-    return MoveResult.moved();
+    return MoveResult.entered();
   }
 
   /// Move a pawn by given steps
-  MoveResult movePawn(Pawn pawn, int steps) {
+  MoveResult movePawn(Pawn pawn, int steps, {int attackerCount = 1}) {
     if (!pawn.isActive) {
       return MoveResult.failed('Pawn is not active');
     }
 
+    final fromIndex = pawn.pathIndex; // Save for animation
     final newIndex = pawn.pathIndex + steps;
     final pathLength = boardController.getPathLength(pawn.playerId);
 
@@ -135,29 +136,113 @@ class PawnController {
     if (destSquare.type == SquareType.center) {
       pawn.finish();
       destSquare.addPawn(pawn);
-      return MoveResult.finished();
+      return MoveResult.finished(fromIndex: fromIndex, toIndex: newIndex);
     }
 
     // Check for kills
-    final killResult = _resolveCollision(pawn, destSquare);
+    final killResult = _resolveCollision(pawn, destSquare, attackerCount: attackerCount);
 
     // Place pawn on destination
     destSquare.addPawn(pawn);
 
     if (killResult.killedOpponent) {
-      return killResult;
+      return MoveResult.kill(
+        type: killResult.killType,
+        victims: killResult.victims,
+        fromIndex: fromIndex,
+        toIndex: newIndex,
+      );
     }
 
-    return MoveResult.moved();
+    return MoveResult.moved(fromIndex: fromIndex, toIndex: newIndex);
+  }
+
+  /// Move multiple stacked pawns together
+  MoveResult moveStackedPawns(List<Pawn> stackedPawns, int steps) {
+    if (stackedPawns.isEmpty) {
+      return MoveResult.failed('No pawns to move');
+    }
+    
+    // All pawns should be at the same position and active
+    final firstPawn = stackedPawns.first;
+    if (!firstPawn.isActive) {
+      return MoveResult.failed('Pawns are not active');
+    }
+    
+    final fromIndex = firstPawn.pathIndex;
+    final newIndex = firstPawn.pathIndex + steps;
+    final pathLength = boardController.getPathLength(firstPawn.playerId);
+    
+    // Check if exceeds path
+    if (newIndex > pathLength - 1) {
+      return MoveResult.failed('Move exceeds path');
+    }
+    
+    // Get current and new positions
+    final currentPos = boardController.getPositionFromPath(firstPawn.playerId, firstPawn.pathIndex);
+    final newPos = boardController.getPositionFromPath(firstPawn.playerId, newIndex);
+    
+    if (currentPos == null || newPos == null) {
+      return MoveResult.failed('Invalid positions');
+    }
+    
+    // Remove all stacked pawns from current square
+    final currentSquare = boardController.getSquare(currentPos);
+    for (final pawn in stackedPawns) {
+      currentSquare?.removePawn(pawn);
+      // Update pawn positions
+      pawn.pathIndex = newIndex;
+      
+      // Update path type based on position
+      final pathPos = boardController.playerPaths[pawn.playerId]![newIndex];
+      if (BoardConfig.isInnerPath(pathPos) || BoardConfig.isCenter(pathPos)) {
+        pawn.currentPath = PathType.inner;
+      }
+    }
+    
+    // Get destination square
+    final destSquare = boardController.getSquare(newPos);
+    if (destSquare == null) {
+      return MoveResult.failed('Destination square not found');
+    }
+    
+    // Check if reached center - all pawns finish
+    if (destSquare.type == SquareType.center) {
+      for (final pawn in stackedPawns) {
+        pawn.finish();
+        destSquare.addPawn(pawn);
+      }
+      return MoveResult.finished(fromIndex: fromIndex, toIndex: newIndex);
+    }
+    
+    // Check for kills - attackerCount = number of stacked pawns
+    final killResult = _resolveCollision(firstPawn, destSquare, attackerCount: stackedPawns.length);
+    
+    // Place all pawns on destination
+    for (final pawn in stackedPawns) {
+      destSquare.addPawn(pawn);
+    }
+    
+    if (killResult.killedOpponent) {
+      return MoveResult.kill(
+        type: killResult.killType,
+        victims: killResult.victims,
+        fromIndex: fromIndex,
+        toIndex: newIndex,
+      );
+    }
+    
+    return MoveResult.moved(fromIndex: fromIndex, toIndex: newIndex);
   }
 
   /// Resolve collision/kill at destination square
   /// 
-  /// AUTHENTIC RULES:
+  /// AUTHENTIC ISTO RULES:
   /// - Safe squares (corners + center): NO kills allowed
   /// - Killing grants EXTRA TURN
-  /// - Cannot kill a double (2 pawns of same player)
-  MoveResult _resolveCollision(Pawn attacker, Square target) {
+  /// - Equal numbers can kill equal numbers (2v2, 3v3, etc.)
+  /// - Cannot kill if attacker has fewer pawns than defender
+  MoveResult _resolveCollision(Pawn attacker, Square target, {int attackerCount = 1}) {
     // Center/Charkoni is safe - no kills
     if (target.type == SquareType.center) {
       return MoveResult.moved();
@@ -174,23 +259,33 @@ class PawnController {
       return MoveResult.moved();
     }
 
-    // AUTHENTIC RULE: Cannot kill a double (2+ same-player pawns)
-    if (enemies.length >= 2) {
-      // Check if they're a double (same player)
-      final samePlayer = enemies.every((e) => e.playerId == enemies[0].playerId);
-      if (samePlayer) {
-        // This is a double - single pawn cannot kill them
-        return MoveResult.moved();
-      }
+    // ISTO RULE: Equal numbers can kill equal numbers
+    // Check if enemies are all same player (forming a stack)
+    final samePlayer = enemies.every((e) => e.playerId == enemies[0].playerId);
+    if (!samePlayer) {
+      // Mixed enemy pawns - shouldn't happen, but treat as multi-kill if possible
+      return MoveResult.moved();
     }
 
-    // Single enemy - CAN BE KILLED
-    if (enemies.length == 1) {
-      _sendPawnHome(enemies[0], target);
-      // AUTHENTIC RULE: Killing grants extra turn (handled in MoveResult.grantsExtraTurn)
+    final defenderCount = enemies.length;
+    
+    // ISTO RULE: Can only kill if attacker count >= defender count
+    // 1 can kill 1, 2 can kill 2, 2 can kill 1, but 1 cannot kill 2
+    if (attackerCount < defenderCount) {
+      // Cannot kill - not enough attackers
+      return MoveResult.moved();
+    }
+    
+    // Kill all enemy pawns on this square if equal or more attackers
+    if (attackerCount >= defenderCount) {
+      for (final enemy in enemies) {
+        _sendPawnHome(enemy, target);
+      }
+      
+      final killType = enemies.length > 1 ? KillType.paired : KillType.single;
       return MoveResult.kill(
-        type: KillType.single,
-        victims: [enemies[0]],
+        type: killType,
+        victims: enemies,
       );
     }
 

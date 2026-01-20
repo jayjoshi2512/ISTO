@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
+import '../config/design_system.dart';
 import '../models/models.dart';
 
 /// Displays cowry shells with realistic animation
@@ -15,13 +16,13 @@ class CowryDisplayComponent extends PositionComponent {
   // Individual shell animation states
   final List<_ShellState> _shellStates = List.generate(4, (_) => _ShellState());
 
-  // Colors matching real cowry shells (from reference image)
-  static const Color bgColor = Color(0xFF1A3A2A);
+  // Colors matching new design system
+  static const Color bgColor = DesignSystem.surface;
   static const Color shellLight = Color(0xFFF5E6D3); // Light cream shell
   static const Color shellDark = Color(0xFFD4A574); // Spotted shell back
   static const Color spotColor = Color(0xFF8B6914); // Brown spots
   static const Color openingColor = Color(0xFF2D1810); // Dark opening
-  static const Color borderColor = Color(0xFF2E7D32);
+  static const Color borderColor = DesignSystem.border;
 
   CowryDisplayComponent({
     required Vector2 position,
@@ -35,34 +36,25 @@ class CowryDisplayComponent extends PositionComponent {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Background panel (wooden/natural feel)
+    // Background panel - clean minimal design
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.x, size.y),
       const Radius.circular(16),
     );
     
-    // Gradient background
-    final gradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        const Color(0xFF2A4A3A),
-        const Color(0xFF1A3A2A),
-        const Color(0xFF152A20),
-      ],
-    );
+    // Clean dark background
     canvas.drawRRect(
       rect, 
-      Paint()..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.x, size.y)),
+      Paint()..color = DesignSystem.surface,
     );
     
-    // Border
+    // Subtle border
     canvas.drawRRect(
       rect,
       Paint()
         ..color = borderColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
+        ..strokeWidth = 1,
     );
 
     // Draw cowries (4 shells)

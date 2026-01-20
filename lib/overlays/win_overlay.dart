@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../config/design_system.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
 
-/// Win overlay shown when a player wins
+/// Clean, celebratory win overlay
 class WinOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -18,6 +19,7 @@ class _WinOverlayState extends State<WinOverlay>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _trophyAnimation;
 
   @override
   void initState() {
@@ -28,16 +30,27 @@ class _WinOverlayState extends State<WinOverlay>
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+      ),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.1, 0.6, curve: Curves.elasticOut),
+      ),
+    );
+
+    _trophyAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 0.8, curve: Curves.easeOutBack),
+      ),
     );
 
     _controller.forward();
-    
-    // Trigger haptic feedback on win
     feedbackService.onWin();
   }
 
@@ -58,146 +71,238 @@ class _WinOverlayState extends State<WinOverlay>
         return Opacity(
           opacity: _fadeAnimation.value,
           child: Container(
-            color: Colors.black.withAlpha((200 * _fadeAnimation.value).toInt()),
-            child: Center(
-              child: Transform.scale(
-                scale: _scaleAnimation.value,
-                child: child,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withAlpha(220),
+                  DesignSystem.bgDark.withAlpha(250),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: child,
+                ),
               ),
             ),
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.all(32),
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: winner.color,
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: winner.color.withAlpha(100),
-              blurRadius: 24,
-              spreadRadius: 4,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Trophy icon
-            Icon(
-              Icons.emoji_events,
-              size: 64,
-              color: winner.color,
-            ),
-            const SizedBox(height: 16),
-
-            // Winner text
-            Text(
-              '${winner.name} Wins!',
-              style: TextStyle(
-                color: winner.color,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Rankings
-            ..._buildRankings(),
-
-            const SizedBox(height: 32),
-
-            // Action buttons
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildButton(
-                  'Play Again',
-                  const Color(0xFF4ECCA3),
-                  () => widget.game.startNewGame(
-                      widget.game.gameManager.playerCount),
-                ),
-                const SizedBox(width: 16),
-                _buildButton(
-                  'Menu',
-                  const Color(0xFF8B0000),
-                  () => widget.game.showMenu(),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      child: _buildContent(winner),
     );
   }
 
-  List<Widget> _buildRankings() {
-    final rankings = widget.game.gameManager.rankings;
-    final widgets = <Widget>[];
-
-    for (int i = 0; i < rankings.length; i++) {
-      final player = rankings[i];
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+  Widget _buildContent(dynamic winner) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.all(32),
+      constraints: const BoxConstraints(maxWidth: 340),
+      decoration: BoxDecoration(
+        gradient: DesignSystem.cardGradient,
+        borderRadius: BorderRadius.circular(DesignSystem.radiusXL),
+        border: Border.all(
+          color: winner.color.withAlpha(150),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: winner.color.withAlpha(60),
+            blurRadius: 40,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Trophy
+          AnimatedBuilder(
+            animation: _trophyAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _trophyAnimation.value,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: DesignSystem.goldGradient,
+                boxShadow: DesignSystem.glowGold,
+              ),
+              child: Icon(
+                Icons.emoji_events,
+                size: 42,
+                color: DesignSystem.bgDark,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Winner announcement
+          Text(
+            'VICTORY',
+            style: DesignSystem.caption.copyWith(
+              color: DesignSystem.accentGold,
+              letterSpacing: 4,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          Text(
+            '${winner.name} Wins!',
+            style: DesignSystem.headingMedium.copyWith(
+              color: winner.color,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Rankings
+          _buildRankings(),
+          
+          const SizedBox(height: 32),
+          
+          // Action buttons
+          Row(
             children: [
-              Text(
-                '${i + 1}.',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 16,
+              Expanded(
+                child: _buildButton(
+                  'Play Again',
+                  DesignSystem.accent,
+                  () {
+                    feedbackService.mediumTap();
+                    widget.game.startNewGame(widget.game.gameManager.playerCount);
+                  },
+                  isPrimary: true,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: player.color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                player.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildButton(
+                  'Menu',
+                  DesignSystem.textMuted,
+                  () {
+                    feedbackService.lightTap();
+                    widget.game.showMenu();
+                  },
+                  isPrimary: false,
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return widgets;
+        ],
+      ),
+    );
   }
 
-  Widget _buildButton(String text, Color color, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+  Widget _buildRankings() {
+    final rankings = widget.game.gameManager.rankings;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: DesignSystem.bgDark.withAlpha(150),
+        borderRadius: BorderRadius.circular(DesignSystem.radiusM),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+      child: Column(
+        children: [
+          for (int i = 0; i < rankings.length; i++)
+            Padding(
+              padding: EdgeInsets.only(top: i > 0 ? 8 : 0),
+              child: Row(
+                children: [
+                  // Rank
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: i == 0 
+                          ? DesignSystem.accentGold.withAlpha(40)
+                          : DesignSystem.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${i + 1}',
+                        style: TextStyle(
+                          color: i == 0 
+                              ? DesignSystem.accentGold 
+                              : DesignSystem.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Player dot
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: rankings[i].color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 8),
+                  
+                  // Player name
+                  Expanded(
+                    child: Text(
+                      rankings[i].name,
+                      style: DesignSystem.bodyMedium.copyWith(
+                        color: i == 0 
+                            ? DesignSystem.textPrimary 
+                            : DesignSystem.textSecondary,
+                        fontWeight: i == 0 ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton(
+    String text, 
+    Color color, 
+    VoidCallback onTap, 
+    {bool isPrimary = true}
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isPrimary ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+          border: isPrimary ? null : Border.all(color: DesignSystem.border),
+          boxShadow: isPrimary ? DesignSystem.glowAccent : null,
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: DesignSystem.button.copyWith(
+              color: isPrimary 
+                  ? DesignSystem.textPrimary 
+                  : DesignSystem.textSecondary,
+            ),
+          ),
         ),
       ),
     );

@@ -134,14 +134,21 @@ class BoardController {
       }
     }
 
-    // Check if destination is blocked by own pawn (outer path only)
+    // Check if destination is blocked by own pawn (outer path only, NOT safe squares)
     final destSquare = getSquareFromPath(pawn.playerId, newIndex);
     if (destSquare == null) return false;
 
     if (destSquare.type == SquareType.outer) {
-      // Outer path: can't land on own pawn
-      final friendlyPawns = destSquare.getFriendlyPawns(pawn.playerId);
-      if (friendlyPawns.isNotEmpty) return false;
+      // ISTO RULE: Can stack multiple pawns on SAFE squares (starting positions)
+      final destPos = playerPaths[pawn.playerId]![newIndex];
+      final isSafe = BoardConfig.isSafeSquare(destPos);
+      
+      if (!isSafe) {
+        // Non-safe outer path: can't land on own pawn
+        final friendlyPawns = destSquare.getFriendlyPawns(pawn.playerId);
+        if (friendlyPawns.isNotEmpty) return false;
+      }
+      // Safe squares: stacking allowed - no block
     }
 
     return true;

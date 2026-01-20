@@ -3,3 +3,6 @@ export 'turn_indicator_overlay.dart';
 export 'win_overlay.dart';
 export 'menu_overlay.dart';
 export 'game_toast_overlay.dart';
+export 'splash_screen.dart';
+export 'settings_overlay.dart';
+export 'stacked_pawn_dialog.dart';

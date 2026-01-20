@@ -152,8 +152,41 @@ class GameManager {
     return _getValidPawns(roll);
   }
 
-  /// Select and move a pawn
-  MoveResult selectPawn(Pawn pawn) {
+  /// Get all pawns stacked with a given pawn (same position, same player)
+  List<Pawn> getStackedPawns(Pawn pawn) {
+    if (pawn.isHome || !pawn.isActive) return [pawn];
+    
+    final pos = pawnController.getPawnPosition(pawn);
+    if (pos == null) return [pawn];
+    
+    final square = boardController.getSquare(pos);
+    if (square == null) return [pawn];
+    
+    return square.getFriendlyPawns(pawn.playerId);
+  }
+  
+  /// Check if a pawn has stackable pawns (for stacked movement decision)
+  bool hasStackedPawns(Pawn pawn) {
+    return getStackedPawns(pawn).length > 1;
+  }
+  
+  /// Check if pawn is on inner path (stacking allowed here)
+  bool isPawnOnInnerPath(Pawn pawn) {
+    if (!pawn.isActive || pawn.isHome) return false;
+    return pawn.currentPath == PathType.inner;
+  }
+  
+  /// Check if current roll allows stacked movement (any roll value in inner path)
+  bool rollAllowsStackedMovement() {
+    final roll = cowryController.lastRoll;
+    return roll != null;
+  }
+
+  /// Callback for stacked pawn dialog choice - passes pawn and count of pawns to move
+  Function(Pawn pawn, int pawnCount)? onStackedPawnChoice;
+
+  /// Select and move a pawn (optionally with stacked pawns)
+  MoveResult selectPawn(Pawn pawn, {int movePawnCount = 1}) {
     if (currentPhase != TurnPhase.selectingPawn) {
       feedbackService.onInvalidMove();
       return MoveResult.failed('Cannot select pawn in phase: $currentPhase');
@@ -179,6 +212,14 @@ class GameManager {
       return MoveResult.failed('Pawn cannot move');
     }
 
+    // Check if this pawn is stacked ON INNER PATH and needs dialog
+    final stackedPawns = getStackedPawns(pawn);
+    if (stackedPawns.length > 1 && isPawnOnInnerPath(pawn) && movePawnCount == 1) {
+      // Ask user how many pawns to move - callback to UI
+      onStackedPawnChoice?.call(pawn, stackedPawns.length);
+      return MoveResult.failed('Waiting for stacked pawn choice');
+    }
+
     // Haptic for selection
     feedbackService.onPawnSelect();
     turnStateMachine.onPawnSelected();
@@ -189,7 +230,14 @@ class GameManager {
       result = pawnController.enterPawn(pawn);
       feedbackService.onPawnEnter();
     } else {
-      result = pawnController.movePawn(pawn, roll.steps);
+      // movePawnCount > 1 means move multiple stacked pawns
+      if (movePawnCount > 1 && stackedPawns.length >= movePawnCount) {
+        // Move specified number of stacked pawns together
+        final pawnsToMove = stackedPawns.take(movePawnCount).toList();
+        result = pawnController.moveStackedPawns(pawnsToMove, roll.steps);
+      } else {
+        result = pawnController.movePawn(pawn, roll.steps, attackerCount: 1);
+      }
       feedbackService.onPawnMove();
     }
     

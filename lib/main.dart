@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'config/design_system.dart';
 import 'game/isto_game.dart';
 import 'overlays/overlays.dart';
 import 'services/feedback_service.dart';
@@ -43,8 +44,34 @@ class ISTOApp extends StatelessWidget {
         ),
         fontFamily: 'Inter',
       ),
-      home: const GameScreen(),
+      home: const SplashWrapper(),
     );
+  }
+}
+
+/// Wrapper widget that shows splash screen first, then game
+class SplashWrapper extends StatefulWidget {
+  const SplashWrapper({super.key});
+
+  @override
+  State<SplashWrapper> createState() => _SplashWrapperState();
+}
+
+class _SplashWrapperState extends State<SplashWrapper> {
+  bool _showSplash = true;
+
+  void _onSplashComplete() {
+    setState(() {
+      _showSplash = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashScreen(onComplete: _onSplashComplete);
+    }
+    return const GameScreen();
   }
 }
 
@@ -76,97 +103,66 @@ class _GameScreenState extends State<GameScreen> {
               TurnIndicatorOverlay(game: game),
           ISTOGame.winOverlay: (context, game) => WinOverlay(game: game),
           ISTOGame.menuOverlay: (context, game) => MenuOverlay(game: game),
+          ISTOGame.stackedPawnDialogOverlay: (context, game) => StackedPawnDialog(
+            game: game,
+            stackedPawns: game.pendingStackedPawns ?? [],
+            rollValue: game.currentRollValue,
+            onChoice: (pawnCount) => game.onStackedPawnChoice(pawnCount),
+          ),
           'extraTurn': (context, game) => ExtraTurnOverlay(game: game),
           'capture': (context, game) => CaptureOverlay(game: game),
-          'noMoves': (context, game) => _NoMovesOverlay(game: game),
+          'noMoves': (context, game) => NoMovesOverlay(game: game),
+          'settings': (context, game) => SettingsOverlay(game: game),
         },
-        loadingBuilder: (context) => const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                color: Color(0xFF4ECCA3),
-              ),
-              SizedBox(height: 24),
-              Text(
-                'Loading ISTO...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-        ),
-        errorBuilder: (context, error) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+        loadingBuilder: (context) => Container(
+          decoration: const BoxDecoration(gradient: DesignSystem.bgGradient),
+          child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red,
+                CircularProgressIndicator(
+                  color: DesignSystem.accent,
+                  strokeWidth: 2,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Text(
-                  'Error loading game',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  'Loading...',
+                  style: DesignSystem.bodyMedium.copyWith(
+                    color: DesignSystem.textMuted,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error.toString(),
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Simple no moves overlay
-class _NoMovesOverlay extends StatelessWidget {
-  final ISTOGame game;
-  
-  const _NoMovesOverlay({required this.game});
-  
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 100,
-      left: 20,
-      right: 20,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade700,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.orange.withAlpha(100),
-                blurRadius: 12,
+        errorBuilder: (context, error) => Container(
+          decoration: const BoxDecoration(gradient: DesignSystem.bgGradient),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: DesignSystem.textMuted,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Something went wrong',
+                    style: DesignSystem.headingSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
+                    style: DesignSystem.caption.copyWith(
+                      color: DesignSystem.textMuted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: const Text(
-            'No valid moves!',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
             ),
           ),
         ),

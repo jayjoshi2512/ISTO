@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 /// Audio service for game sound effects
-/// Uses tone synthesis for cross-platform compatibility
+/// Uses audioplayers for cross-platform audio playback
 class AudioService {
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
@@ -10,124 +11,159 @@ class AudioService {
 
   bool _soundEnabled = true;
   bool _initialized = false;
+  double _volume = 0.8;
+
+  // Single audio player that we reuse
+  AudioPlayer? _player;
+  
+  // Available sound files (matching what exists in assets/sounds/)
+  static const Map<String, String> _soundFiles = {
+    'roll': 'sounds/roll.mp3',
+    'move': 'sounds/move.mp3',
+    'tap': 'sounds/tap.mp3',
+    'enter': 'sounds/enter.mp3',
+    'blocked': 'sounds/blocked.mp3',
+  };
 
   bool get soundEnabled => _soundEnabled;
   bool get isInitialized => _initialized;
+  double get volume => _volume;
 
   /// Initialize audio system
   Future<void> initialize() async {
     if (_initialized) return;
     
     try {
+      _player = AudioPlayer();
+      await _player!.setVolume(_volume);
+      await _player!.setReleaseMode(ReleaseMode.stop);
+      
       _initialized = true;
-      debugPrint('AudioService: Initialized (simulated sounds for web)');
+      debugPrint('AudioService: Initialized successfully');
     } catch (e) {
       debugPrint('AudioService: Failed to initialize: $e');
+      _initialized = true; // Still mark as initialized to prevent retries
     }
   }
 
   void setSoundEnabled(bool enabled) {
     _soundEnabled = enabled;
+    debugPrint('AudioService: Sound ${enabled ? "enabled" : "disabled"}');
+  }
+
+  void setVolume(double volume) {
+    _volume = volume.clamp(0.0, 1.0);
+    _player?.setVolume(_volume);
   }
 
   /// Dispose audio resources
   void dispose() {
+    _player?.dispose();
+    _player = null;
     _initialized = false;
   }
 
+  /// Play a sound by name
+  Future<void> _playSound(String name) async {
+    if (!_soundEnabled) {
+      debugPrint('AudioService: Sound disabled, skipping $name');
+      return;
+    }
+    
+    final soundFile = _soundFiles[name];
+    if (soundFile == null) {
+      debugPrint('AudioService: Unknown sound: $name');
+      return;
+    }
+    
+    try {
+      // Create a new player for each sound to allow overlapping
+      final player = AudioPlayer();
+      await player.setVolume(_volume);
+      await player.setReleaseMode(ReleaseMode.release);
+      await player.play(AssetSource(soundFile));
+      debugPrint('AudioService: Playing $name');
+      
+      // Auto dispose after playback
+      player.onPlayerComplete.listen((_) {
+        player.dispose();
+      });
+    } catch (e) {
+      debugPrint('AudioService: Error playing $name: $e');
+    }
+  }
+
   // ============ SOUND EFFECT METHODS ============
-  // These will be called to trigger sounds
-  // For web, we'll use visual feedback instead
 
   /// Play dice/cowry roll sound
   Future<void> playRollSound() async {
-    if (!_soundEnabled) return;
-    // Simulated - would play a shell rattling sound
-    _logSound('ROLL - shells rattling');
+    await _playSound('roll');
   }
 
   /// Play shell settle sound
   Future<void> playShellSettle() async {
-    if (!_soundEnabled) return;
-    _logSound('SETTLE - shells landing');
+    await _playSound('roll');
   }
 
   /// Play pawn select/tap sound
   Future<void> playPawnSelect() async {
-    if (!_soundEnabled) return;
-    _logSound('TAP - pawn selected');
+    await _playSound('tap');
   }
 
   /// Play pawn move sound
   Future<void> playPawnMove() async {
-    if (!_soundEnabled) return;
-    _logSound('MOVE - pawn sliding');
+    await _playSound('move');
   }
 
   /// Play pawn enter board sound
   Future<void> playPawnEnter() async {
-    if (!_soundEnabled) return;
-    _logSound('ENTER - pawn placed on board');
+    await _playSound('enter');
   }
 
   /// Play capture/kill sound - dramatic
   Future<void> playCapture() async {
-    if (!_soundEnabled) return;
-    _logSound('CAPTURE! - opponent taken');
+    // Use move sound as fallback if capture.mp3 doesn't exist
+    await _playSound('move');
   }
 
   /// Play CHOWKA (4) or ASHTA (8) sound - victory fanfare
   Future<void> playGraceThrow() async {
-    if (!_soundEnabled) return;
-    _logSound('GRACE! - Chowka/Ashta rolled');
+    await _playSound('roll');
   }
 
   /// Play extra turn notification
   Future<void> playExtraTurn() async {
-    if (!_soundEnabled) return;
-    _logSound('EXTRA TURN - bonus throw');
+    await _playSound('tap');
   }
 
   /// Play pawn reaching home/center
   Future<void> playPawnFinish() async {
-    if (!_soundEnabled) return;
-    _logSound('HOME! - pawn finished');
+    await _playSound('enter');
   }
 
   /// Play win/victory sound
   Future<void> playWin() async {
-    if (!_soundEnabled) return;
-    _logSound('VICTORY! - player wins');
+    await _playSound('enter');
   }
 
   /// Play blocked/no moves sound
   Future<void> playBlocked() async {
-    if (!_soundEnabled) return;
-    _logSound('BLOCKED - no valid moves');
+    await _playSound('blocked');
   }
 
   /// Play invalid move/error sound
   Future<void> playError() async {
-    if (!_soundEnabled) return;
-    _logSound('ERROR - invalid action');
+    await _playSound('blocked');
   }
 
   /// Play turn change notification
   Future<void> playTurnChange() async {
-    if (!_soundEnabled) return;
-    _logSound('TURN - next player');
+    await _playSound('tap');
   }
 
   /// Play double formed sound
   Future<void> playDouble() async {
-    if (!_soundEnabled) return;
-    _logSound('DOUBLE - pawns paired');
-  }
-
-  void _logSound(String soundName) {
-    if (kDebugMode) {
-      debugPrint('🔊 Sound: $soundName');
-    }
+    await _playSound('move');
   }
 }
 

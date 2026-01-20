@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../config/design_system.dart';
 import '../game/isto_game.dart';
 
-/// Toast-style overlay for game notifications
+/// Clean, minimal toast notifications for game events
 class GameToastOverlay extends StatefulWidget {
   final ISTOGame game;
   final String message;
   final Color color;
+  final IconData? icon;
   final Duration duration;
   final VoidCallback? onDismiss;
 
@@ -14,7 +16,8 @@ class GameToastOverlay extends StatefulWidget {
     super.key,
     required this.game,
     required this.message,
-    this.color = const Color(0xFF4CAF50),
+    this.color = DesignSystem.accent,
+    this.icon,
     this.duration = const Duration(seconds: 2),
     this.onDismiss,
   });
@@ -33,7 +36,7 @@ class _GameToastOverlayState extends State<GameToastOverlay>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       vsync: this,
     );
 
@@ -42,13 +45,12 @@ class _GameToastOverlayState extends State<GameToastOverlay>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1),
+      begin: const Offset(0, -0.5),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward();
 
-    // Auto dismiss after duration
     Future.delayed(widget.duration, () {
       if (mounted) {
         _controller.reverse().then((_) {
@@ -70,45 +72,59 @@ class _GameToastOverlayState extends State<GameToastOverlay>
       animation: _controller,
       builder: (context, child) {
         return Positioned(
-          top: 100,
-          left: 20,
-          right: 20,
+          top: MediaQuery.of(context).padding.top + 80,
+          left: 32,
+          right: 32,
           child: SlideTransition(
             position: _slideAnimation,
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.color,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: widget.color.withAlpha(100),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    widget.message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
+              child: Center(child: child),
             ),
           ),
         );
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: DesignSystem.surface,
+          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+          border: Border.all(
+            color: widget.color.withAlpha(100),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withAlpha(40),
+              blurRadius: 16,
+            ),
+            BoxShadow(
+              color: Colors.black.withAlpha(60),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.icon != null) ...[
+              Icon(
+                widget.icon,
+                color: widget.color,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+            ],
+            Text(
+              widget.message,
+              style: DesignSystem.bodyMedium.copyWith(
+                color: DesignSystem.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -132,20 +148,21 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
 
     _controller.forward();
 
-    // Auto dismiss
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        widget.game.overlays.remove('extraTurn');
+        _controller.reverse().then((_) {
+          widget.game.overlays.remove('extraTurn');
+        });
       }
     });
   }
@@ -161,37 +178,47 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Center(
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFFD700).withAlpha(150),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: const Text(
-                '🎯 EXTRA TURN! 🎯',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 80,
+          left: 32,
+          right: 32,
+          child: Center(
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Opacity(
+                opacity: _controller.value,
+                child: child,
               ),
             ),
           ),
         );
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: DesignSystem.goldGradient,
+          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+          boxShadow: DesignSystem.glowGold,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.auto_awesome,
+              color: Color(0xFF1A1025),
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'EXTRA TURN!',
+              style: DesignSystem.button.copyWith(
+                color: DesignSystem.bgDark,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -199,13 +226,8 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
 /// Capture notification overlay
 class CaptureOverlay extends StatefulWidget {
   final ISTOGame game;
-  final String victimName;
 
-  const CaptureOverlay({
-    super.key,
-    required this.game,
-    this.victimName = 'opponent',
-  });
+  const CaptureOverlay({super.key, required this.game});
 
   @override
   State<CaptureOverlay> createState() => _CaptureOverlayState();
@@ -220,7 +242,7 @@ class _CaptureOverlayState extends State<CaptureOverlay>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -230,10 +252,11 @@ class _CaptureOverlayState extends State<CaptureOverlay>
 
     _controller.forward();
 
-    // Auto dismiss
-    Future.delayed(const Duration(milliseconds: 1200), () {
+    Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        widget.game.overlays.remove('capture');
+        _controller.reverse().then((_) {
+          widget.game.overlays.remove('capture');
+        });
       }
     });
   }
@@ -249,35 +272,142 @@ class _CaptureOverlayState extends State<CaptureOverlay>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Center(
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE53935),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE53935).withAlpha(150),
-                    blurRadius: 16,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: const Text(
-                '💥 HIT! 💥',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 80,
+          left: 32,
+          right: 32,
+          child: Center(
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Opacity(
+                opacity: _controller.value,
+                child: child,
               ),
             ),
           ),
         );
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE53935),
+          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE53935).withAlpha(80),
+              blurRadius: 16,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.flash_on,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'CAPTURED!',
+              style: DesignSystem.button.copyWith(
+                color: Colors.white,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// No valid moves notification overlay
+class NoMovesOverlay extends StatefulWidget {
+  final ISTOGame game;
+
+  const NoMovesOverlay({super.key, required this.game});
+
+  @override
+  State<NoMovesOverlay> createState() => _NoMovesOverlayState();
+}
+
+class _NoMovesOverlayState extends State<NoMovesOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    )..forward();
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        _controller.reverse().then((_) {
+          widget.game.overlays.remove('noMoves');
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 80,
+          left: 32,
+          right: 32,
+          child: Center(
+            child: Opacity(
+              opacity: _controller.value,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        decoration: BoxDecoration(
+          color: DesignSystem.surface,
+          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+          border: Border.all(color: Colors.orange.withAlpha(150)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withAlpha(40),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.block,
+              color: Colors.orange,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'No valid moves',
+              style: DesignSystem.bodyMedium.copyWith(
+                color: DesignSystem.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

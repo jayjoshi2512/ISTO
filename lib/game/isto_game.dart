@@ -3,6 +3,7 @@ import 'package:flame/game.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
+import '../config/design_system.dart';
 import '../models/models.dart';
 import '../components/components.dart';
 import '../services/feedback_service.dart';
@@ -27,13 +28,18 @@ class ISTOGame extends FlameGame with TapCallbacks {
   static const String turnIndicatorOverlay = 'turnIndicator';
   static const String winOverlay = 'win';
   static const String menuOverlay = 'menu';
+  static const String stackedPawnDialogOverlay = 'stackedPawnDialog';
+  
+  // Stacked pawn selection state
+  Pawn? _pendingStackedPawn;
+  List<Pawn>? _pendingStackedPawns;
 
   ISTOGame() {
     gameManager = GameManager();
   }
 
   @override
-  Color backgroundColor() => const Color(0xFF1A0F2E);  // Dark purple to match board
+  Color backgroundColor() => DesignSystem.bgDark;
 
   @override
   Future<void> onLoad() async {
@@ -42,11 +48,18 @@ class ISTOGame extends FlameGame with TapCallbacks {
     // Calculate responsive sizes for the screen
     _calculateSizes();
 
-    // Calculate board position (centered)
+    // Calculate board position (centered, with space for home areas)
     final boardTotalSize = 5 * squareSize + 4 * 1; // 5 squares + 4 gaps of 1px
     final boardX = (size.x - boardTotalSize) / 2;
-    // Center vertically with more space for top/bottom player areas
-    final boardY = (size.y - boardTotalSize) / 2;
+    
+    // Reserve space for home areas
+    // Home area height = boardTotalSize * 0.16, offset = 10
+    final homeAreaHeight = boardTotalSize * 0.16 + 10;
+    
+    // For 3/4 players, we need space both top and bottom
+    // For 2 players, only bottom
+    // Adjust center point to account for this
+    final boardY = (size.y - boardTotalSize) / 2 + homeAreaHeight * 0.3;
 
     // Create board component
     boardComponent = BoardComponent(
@@ -58,9 +71,10 @@ class ISTOGame extends FlameGame with TapCallbacks {
     );
     add(boardComponent);
 
-    // Create cowry display below board
+    // Create cowry display - positioned between board and roll button area
+    // More visible position above the bottom UI
     cowryDisplayComponent = CowryDisplayComponent(
-      position: Vector2(size.x / 2, size.y - 60),
+      position: Vector2(size.x / 2, size.y - 130),
     );
     add(cowryDisplayComponent);
 
@@ -72,28 +86,28 @@ class ISTOGame extends FlameGame with TapCallbacks {
   }
   
   void _calculateSizes() {
-    // Optimize for mobile screens
-    // Screen is typically portrait with ~16:9 or taller aspect ratio
+    // Optimize for mobile screens - MAXIMIZE board size
     final screenWidth = size.x;
     final screenHeight = size.y;
     
-    // Board should fit comfortably with player areas
-    // Reserve ~15% on each side for left/right player areas
-    // Reserve ~20% on top and bottom for player areas + UI
-    final availableWidth = screenWidth * 0.70;
-    final availableHeight = screenHeight * 0.50;
+    // Reserve space for UI elements:
+    // - Top: ~80px for turn indicator
+    // - Bottom: ~140px for cowry display + roll button
+    // - Sides: ~16px padding each
+    final availableWidth = screenWidth - 32;
+    final availableHeight = screenHeight - 220; // 80 top + 140 bottom
     
-    // Use the smaller dimension
+    // Use the smaller dimension for board
     final boardArea = availableWidth < availableHeight ? availableWidth : availableHeight;
     
-    // Board is 5 squares + 4 gaps (1px each)
-    squareSize = (boardArea - 4) / 5;
+    // Board is 5 squares + 4 gaps (2px each)
+    squareSize = (boardArea - 8) / 5;
     
-    // Clamp to reasonable range
-    if (squareSize < 45) squareSize = 45;
-    if (squareSize > 70) squareSize = 70;
+    // Allow larger squares - up to 100px
+    if (squareSize < 40) squareSize = 40;
+    if (squareSize > 100) squareSize = 100;
     
-    boardSize = squareSize * 5 + 4;
+    boardSize = squareSize * 5 + 8;
     
     // Pawn size relative to square
     pawnSize = squareSize * 0.5;
@@ -108,7 +122,120 @@ class ISTOGame extends FlameGame with TapCallbacks {
     gameManager.onValidMovesCalculated = _onValidMovesCalculated;
     gameManager.onExtraTurn = _onExtraTurn;
     gameManager.onNoValidMoves = _onNoValidMoves;
+    gameManager.onStackedPawnChoice = _onStackedPawnChoiceNeeded;
   }
+  
+  void _onStackedPawnChoiceNeeded(Pawn pawn, int stackedCount) {
+    // Store the pending pawn and show dialog
+    _pendingStackedPawn = pawn;
+    _pendingStackedPawns = gameManager.getStackedPawns(pawn);
+    overlays.add(stackedPawnDialogOverlay);
+  }
+  
+  /// Handle user's choice on stacked pawn movement - now takes count
+  void onStackedPawnChoice(int pawnCount) {
+    overlays.remove(stackedPawnDialogOverlay);
+    
+    if (_pendingStackedPawn != null) {
+      final pawn = _pendingStackedPawn!;
+      _pendingStackedPawn = null;
+      _pendingStackedPawns = null;
+      
+      // Execute move with specified pawn count
+      _executeStackedPawnMove(pawn, pawnCount);
+    }
+  }
+  
+  void _executeStackedPawnMove(Pawn pawn, int pawnCount) {
+    final roll = gameManager.cowryController.lastRoll;
+    if (roll == null) return;
+    
+    _feedback.onPawnSelect();
+    gameManager.turnStateMachine.onPawnSelected();
+    
+    final stackedPawns = gameManager.getStackedPawns(pawn);
+    final fromIdx = pawn.pathIndex; // Current position before move
+    
+    // Calculate steps per pawn: divide roll by number of pawns moving
+    final stepsPerPawn = roll.steps ~/ pawnCount;
+    
+    MoveResult result;
+    if (pawnCount > 1 && stackedPawns.length >= pawnCount) {
+      // Move specified number of pawns together, each moves stepsPerPawn
+      final pawnsToMove = stackedPawns.take(pawnCount).toList();
+      result = gameManager.pawnController.moveStackedPawns(pawnsToMove, stepsPerPawn);
+      
+      // Animate all moving pawns
+      for (final p in pawnsToMove) {
+        boardComponent.animatePawnMove(p, fromIdx, p.pathIndex);
+      }
+    } else {
+      // Single pawn moves full roll value
+      result = gameManager.pawnController.movePawn(pawn, roll.steps, attackerCount: 1);
+      boardComponent.animatePawnMove(pawn, fromIdx, pawn.pathIndex);
+    }
+    
+    _feedback.onPawnMove();
+    
+    // Track capture
+    if (result.killedOpponent) {
+      gameManager.captureCount[pawn.playerId] = 
+          (gameManager.captureCount[pawn.playerId] ?? 0) + result.victims.length;
+      _feedback.onCapture();
+    }
+    
+    // Handle move result
+    gameManager.turnStateMachine.onMoveComplete(result);
+    
+    // Check if player finished
+    if (gameManager.pawnController.hasPlayerWon(pawn.playerId)) {
+      gameManager.turnStateMachine.markPlayerFinished(pawn.playerId);
+      gameManager.players[pawn.playerId].rank = gameManager.turnStateMachine.getRank(pawn.playerId);
+      _feedback.onWin();
+      gameManager.onPlayerFinished?.call(pawn.playerId);
+    }
+    
+    highlightedPawns.clear();
+    boardComponent.clearHighlights();
+    
+    _onMoveComplete(pawn, result);
+    
+    // CRITICAL: Check game state to handle turn transitions
+    // This was missing and caused the game to freeze!
+    _checkAndAdvanceTurn(result);
+  }
+  
+  /// Check game state and advance turn after a move
+  void _checkAndAdvanceTurn(MoveResult result) {
+    if (gameManager.turnStateMachine.isGameOver) {
+      // Mark last player
+      final lastPlace = gameManager.turnStateMachine.lastPlacePlayerId;
+      if (lastPlace != null) {
+        gameManager.players[lastPlace].rank = gameManager.playerCount;
+      }
+      gameManager.onGameOver?.call(gameManager.turnStateMachine.winnerId!);
+    } else if (gameManager.turnStateMachine.extraTurnPending ||
+        gameManager.currentPhase == TurnPhase.checkingExtraTurn) {
+      // Check for extra turn
+      if (gameManager.turnStateMachine.extraTurnPending) {
+        _feedback.onExtraTurn();
+        gameManager.onExtraTurn?.call();
+      }
+      gameManager.turnStateMachine.endTurn();
+      
+      // Notify turn change
+      if (!gameManager.turnStateMachine.extraTurnPending) {
+        _feedback.onTurnStart();
+      }
+    }
+    gameManager.onStateChanged?.call();
+  }
+  
+  /// Get pending stacked pawns for dialog
+  List<Pawn>? get pendingStackedPawns => _pendingStackedPawns;
+  
+  /// Get current roll value for dialog
+  int get currentRollValue => gameManager.cowryController.lastRoll?.steps ?? 0;
 
   void _onGameStateChanged() {
     // Update board display
@@ -138,12 +265,26 @@ class ISTOGame extends FlameGame with TapCallbacks {
     highlightedPawns.clear();
     boardComponent.clearHighlights();
     
+    // Trigger smooth pawn animation (only for movement, not entry)
+    if (result.success) {
+      // Skip animation for entry - pawn just appears on start square
+      // Only animate for actual movement on board
+      if (!result.wasEntry && result.fromPathIndex != null && result.toPathIndex != null) {
+        boardComponent.animatePawnMove(pawn, result.fromPathIndex!, result.toPathIndex!);
+      }
+    }
+    
     _feedback.onPawnMove();
     
     // Show capture overlay
     if (result.killedOpponent) {
       overlays.add('capture');
       _feedback.onCapture();
+      
+      // Animate killed pawns going home
+      for (final victim in result.victims) {
+        boardComponent.animatePawnSentHome(victim);
+      }
     }
     
     // Feedback for finishing (reaching center)

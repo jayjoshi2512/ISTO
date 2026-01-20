@@ -3,26 +3,9 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 
+import '../config/player_colors.dart';
 import '../models/models.dart';
 import '../config/board_config.dart';
-
-/// Player colors matching the board
-class PawnColors {
-  static const Color player0 = Color(0xFFE57373); // Red (Bottom)
-  static const Color player1 = Color(0xFF81C784); // Green (Top)
-  static const Color player2 = Color(0xFFFFD54F); // Yellow (Left)
-  static const Color player3 = Color(0xFF64B5F6); // Blue (Right)
-  
-  static Color getColor(int playerId) {
-    switch (playerId) {
-      case 0: return player0;
-      case 1: return player1;
-      case 2: return player2;
-      case 3: return player3;
-      default: return player0;
-    }
-  }
-}
 
 /// Animated pawn that moves smoothly between squares
 class AnimatedPawnComponent extends PositionComponent {
@@ -152,7 +135,7 @@ class AnimatedPawnComponent extends PositionComponent {
   void render(Canvas canvas) {
     super.render(canvas);
     
-    final color = PawnColors.getColor(pawn.playerId);
+    final color = PlayerColors.getColor(pawn.playerId);
     final centerX = size.x / 2;
     final centerY = size.y / 2 - _bounceOffset;
     final radius = (size.x / 2) * (_isEnterAnimation ? _enterScale : _killScale);

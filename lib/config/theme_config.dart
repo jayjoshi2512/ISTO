@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'player_colors.dart';
+
 /// Theme configuration for ISTO game
 class ThemeConfig {
   // ============ COLORS ============
@@ -25,42 +27,14 @@ class ThemeConfig {
   /// Selected square
   static const Color squareSelected = Color(0xFF6C63FF);
 
-  // ============ PLAYER COLORS (Authentic Isto) ============
+  // ============ PLAYER COLORS (Unified - from PlayerColors) ============
+  // Use PlayerColors class for consistency across the app
 
-  static const Color player1Color = Color(0xFF26A69A); // Teal (Bottom - P0)
-  static const Color player2Color = Color(0xFF4CAF50); // Green (Top - P1)
-  static const Color player3Color = Color(0xFFFFD54F); // Yellow (Left - P2)
-  static const Color player4Color = Color(0xFFE57373); // Red/Coral (Right - P3)
-
-  static const List<Color> playerColors = [
-    player1Color,
-    player2Color,
-    player3Color,
-    player4Color,
-  ];
-
-  static Color getPlayerColor(int playerId) {
-    if (playerId >= 0 && playerId < playerColors.length) {
-      return playerColors[playerId];
-    }
-    return player1Color;
-  }
+  static Color getPlayerColor(int playerId) => PlayerColors.getColor(playerId);
 
   // ============ PLAYER NAMES ============
 
-  static const List<String> defaultPlayerNames = [
-    'Teal',
-    'Green',
-    'Yellow',
-    'Red',
-  ];
-
-  static String getPlayerName(int playerId) {
-    if (playerId >= 0 && playerId < defaultPlayerNames.length) {
-      return defaultPlayerNames[playerId];
-    }
-    return 'Player ${playerId + 1}';
-  }
+  static String getPlayerName(int playerId) => PlayerColors.getName(playerId);
 
   // ============ COWRY COLORS ============
 

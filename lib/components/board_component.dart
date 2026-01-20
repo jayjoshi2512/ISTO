@@ -4,40 +4,36 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 import '../config/board_config.dart';
+import '../config/design_system.dart';
+import '../config/player_colors.dart';
+import '../config/layout_config.dart';
 import '../models/models.dart';
 import '../game/game_manager.dart';
 
-/// Player colors matching reference - vibrant and distinct
+/// Board colors - unified with design system
 class IstoColors {
-  // Board colors - dark purple theme like reference
-  static const Color boardBackground = Color(0xFF2D1B3D);  // Dark purple
-  static const Color squareNormal = Color(0xFF3D2952);      // Purple square
-  static const Color squareBorder = Color(0xFF5C3D7A);      // Lighter border
+  // Board colors - clean minimal dark theme
+  static const Color boardBackground = DesignSystem.bgMedium;
+  static const Color squareNormal = DesignSystem.surface;
+  static const Color squareBorder = DesignSystem.border;
+  static const Color squareInner = DesignSystem.surfaceLight;
   
-  // Player colors matching reference image
-  static const Color player0 = Color(0xFFE57373); // Red/Coral (Bottom)
-  static const Color player1 = Color(0xFF81C784); // Green (Top)
-  static const Color player2 = Color(0xFFFFD54F); // Yellow/Amber (Left)
-  static const Color player3 = Color(0xFF64B5F6); // Blue (Right)
+  // Player colors - delegate to PlayerColors for consistency
+  static Color get player0 => PlayerColors.player0;
+  static Color get player1 => PlayerColors.player1;
+  static Color get player2 => PlayerColors.player2;
+  static Color get player3 => PlayerColors.player3;
   
-  static const Color highlight = Color(0xFFFFEB3B);
-  static const Color centerColor = Color(0xFFE57373);  // Red center like reference
+  static const Color highlight = DesignSystem.accentGold;
+  static const Color centerColor = Color(0xFFD4AF37);  // Gold center
   
-  static Color getPlayerColor(int playerId) {
-    switch (playerId) {
-      case 0: return player0;
-      case 1: return player1;
-      case 2: return player2;
-      case 3: return player3;
-      default: return player0;
-    }
-  }
+  static Color getPlayerColor(int playerId) => PlayerColors.getColor(playerId);
   
   /// Get safe square color based on which player's start it is
   static Color getSafeSquareColor(int row, int col) {
     final playerId = BoardConfig.getPlayerAtStart([row, col]);
     if (playerId != null) {
-      return getPlayerColor(playerId);
+      return getPlayerColor(playerId).withAlpha(180);
     }
     // Center square
     if (row == 2 && col == 2) {
@@ -47,7 +43,15 @@ class IstoColors {
   }
 }
 
-/// Main board component - renders 5x5 ISTO board like reference image
+/// Animation types for different pawn movements
+enum PawnAnimationType {
+  move,      // Normal movement - hopping
+  enter,     // Entering board - slide with bounce
+  captured,  // Being captured - spin and shrink
+  finish,    // Reaching center - celebration
+}
+
+/// Main board component - renders 5x5 ISTO board
 class BoardComponent extends PositionComponent with TapCallbacks {
   final GameManager gameManager;
   final double squareSize;
@@ -58,6 +62,10 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   final Map<String, Vector2> _pawnPositions = {};
   final Map<String, List<Vector2>> _pawnPaths = {};
   final Map<String, int> _pawnPathIndex = {};
+  final Map<String, PawnAnimationType> _pawnAnimationType = {};
+  final Map<String, double> _pawnAnimationPhase = {};  // 0-1 for hop/bounce
+  final Map<String, double> _pawnScale = {};  // For capture animation
+  final Map<String, double> _pawnRotation = {};  // For capture spin
   bool _isAnimating = false;
 
   final Set<String> _highlightedPawns = {};
@@ -70,7 +78,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     this.onPawnTap,
   }) : super(position: position);
 
-  double get gap => 1.0;
+  double get gap => 2.0;
   double get totalSize => 5 * squareSize + 4 * gap;
 
   @override
@@ -100,20 +108,55 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     if (!_isAnimating) return;
     
     bool stillAnimating = false;
-    final speed = squareSize * 8; // pixels per second
+    // Base speed - time to move one square
+    final baseSpeed = squareSize * 3.0;
     
     for (final pawnId in _pawnPaths.keys.toList()) {
       final path = _pawnPaths[pawnId]!;
       var pathIndex = _pawnPathIndex[pawnId] ?? 0;
+      final animType = _pawnAnimationType[pawnId] ?? PawnAnimationType.move;
       
       if (pathIndex >= path.length) {
+        // Animation complete - cleanup
         _pawnPaths.remove(pawnId);
         _pawnPathIndex.remove(pawnId);
+        _pawnAnimationType.remove(pawnId);
+        _pawnAnimationPhase.remove(pawnId);
+        _pawnScale.remove(pawnId);
+        _pawnRotation.remove(pawnId);
+        _pawnPositions.remove(pawnId); // Clear position so it uses real position
         continue;
       }
       
-      final currentPos = _pawnPositions[pawnId] ?? path[0];
+      final startPos = pathIndex == 0 
+          ? (_pawnPositions[pawnId] ?? path[0])
+          : path[pathIndex - 1];
       final targetPos = path[pathIndex];
+      final currentPos = _pawnPositions[pawnId] ?? startPos;
+      
+      final totalDist = (targetPos - startPos).length;
+      final currentDist = (currentPos - startPos).length;
+      
+      // Calculate progress within this square (0.0 to 1.0)
+      final progress = totalDist > 0 ? (currentDist / totalDist).clamp(0.0, 1.0) : 0.0;
+      
+      // Phase is tied to progress - one complete hop per square
+      _pawnAnimationPhase[pawnId] = progress;
+      
+      // Speed varies by animation type
+      final speed = animType == PawnAnimationType.captured 
+          ? baseSpeed * 1.5 
+          : baseSpeed;
+      
+      // Handle capture animation (spin + shrink)
+      if (animType == PawnAnimationType.captured) {
+        var rotation = _pawnRotation[pawnId] ?? 0.0;
+        rotation += dt * 12.0;
+        _pawnRotation[pawnId] = rotation;
+        
+        final overallProgress = pathIndex / path.length.toDouble();
+        _pawnScale[pawnId] = 1.0 - (overallProgress * 0.5);
+      }
       
       final diff = targetPos - currentPos;
       final dist = diff.length;
@@ -122,6 +165,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         // Reached this waypoint
         _pawnPositions[pawnId] = targetPos.clone();
         _pawnPathIndex[pawnId] = pathIndex + 1;
+        _pawnAnimationPhase[pawnId] = 0.0;
         stillAnimating = true;
       } else {
         // Move towards target
@@ -133,8 +177,16 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     
     _isAnimating = stillAnimating;
   }
+  
+  /// Get hop offset for bouncy animation - one hop per square
+  double _getHopOffset(double phase, PawnAnimationType type) {
+    if (type == PawnAnimationType.captured) return 0;
+    // Parabolic hop: peaks at phase 0.5 (middle of square traversal)
+    final hopHeight = 10.0;
+    return -hopHeight * sin(phase * pi);
+  }
 
-  /// Start pawn movement animation through path
+  /// Start pawn movement animation through path with hopping
   void animatePawnMove(Pawn pawn, int fromIndex, int toIndex) {
     final path = BoardConfig.getPlayerPath(pawn.playerId);
     final positions = <Vector2>[];
@@ -144,7 +196,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       _pawnPositions[pawn.id] = _getSquareCenter(path[fromIndex][0], path[fromIndex][1]);
     }
     
-    // Build path
+    // Build path through each intermediate square for smooth animation
     for (int i = fromIndex + 1; i <= toIndex && i < path.length; i++) {
       positions.add(_getSquareCenter(path[i][0], path[i][1]));
     }
@@ -152,48 +204,66 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     if (positions.isNotEmpty) {
       _pawnPaths[pawn.id] = positions;
       _pawnPathIndex[pawn.id] = 0;
+      _pawnAnimationType[pawn.id] = PawnAnimationType.move;
+      _pawnAnimationPhase[pawn.id] = 0.0;
       _isAnimating = true;
     }
   }
 
-  /// Animate pawn entering board
+  /// Animate pawn entering board from home with bounce
   void animatePawnEnter(Pawn pawn) {
     final startPos = BoardConfig.startPositions[pawn.playerId]!;
     final target = _getSquareCenter(startPos[0], startPos[1]);
     
-    // Start from home area
+    // Start from home area (using new 2-sided layout)
     final homePos = _getHomePawnPosition(pawn.playerId, pawn.pawnIndex);
     _pawnPositions[pawn.id] = homePos;
     _pawnPaths[pawn.id] = [target];
     _pawnPathIndex[pawn.id] = 0;
+    _pawnAnimationType[pawn.id] = PawnAnimationType.enter;
+    _pawnAnimationPhase[pawn.id] = 0.0;
     _isAnimating = true;
   }
 
-  Vector2 _getHomePawnPosition(int playerId, int pawnIndex) {
-    final areaSize = squareSize * 1.0;
-    final offset = 8.0;
-    
-    double baseX, baseY;
-    switch (playerId) {
-      case 0: // Bottom
-        baseX = totalSize / 2;
-        baseY = totalSize + offset + areaSize / 2;
-        return Vector2(baseX + (pawnIndex - 1.5) * pawnSize * 1.2, baseY);
-      case 1: // Top
-        baseX = totalSize / 2;
-        baseY = -offset - areaSize / 2;
-        return Vector2(baseX + (pawnIndex - 1.5) * pawnSize * 1.2, baseY);
-      case 2: // Left
-        baseX = -offset - areaSize / 2;
-        baseY = totalSize / 2;
-        return Vector2(baseX, baseY + (pawnIndex - 1.5) * pawnSize * 1.2);
-      case 3: // Right
-        baseX = totalSize + offset + areaSize / 2;
-        baseY = totalSize / 2;
-        return Vector2(baseX, baseY + (pawnIndex - 1.5) * pawnSize * 1.2);
-      default:
-        return Vector2.zero();
+  /// Animate pawn being sent back to home (when captured) with spin
+  void animatePawnSentHome(Pawn pawn) {
+    // Get the pawn's last known position or current animated position
+    Vector2 currentPos;
+    if (_pawnPositions.containsKey(pawn.id)) {
+      currentPos = _pawnPositions[pawn.id]!;
+    } else {
+      // Try to get current board position
+      final pos = gameManager.getPawnPosition(pawn);
+      if (pos != null) {
+        currentPos = _getSquareCenter(pos.row, pos.col);
+      } else {
+        currentPos = _getHomePawnPosition(pawn.playerId, pawn.pawnIndex);
+      }
     }
+    
+    // Target is home area (using new 2-sided layout)
+    final homePos = _getHomePawnPosition(pawn.playerId, pawn.pawnIndex);
+    
+    _pawnPositions[pawn.id] = currentPos;
+    _pawnPaths[pawn.id] = [homePos];
+    _pawnPathIndex[pawn.id] = 0;
+    _pawnAnimationType[pawn.id] = PawnAnimationType.captured;
+    _pawnRotation[pawn.id] = 0.0;
+    _pawnScale[pawn.id] = 1.0;
+    _isAnimating = true;
+  }
+
+  /// Get home pawn position using new 2-sided layout (bottom/top only)
+  Vector2 _getHomePawnPosition(int playerId, int pawnIndex) {
+    final playerCount = gameManager.playerCount;
+    final offset = LayoutConfig.getPawnHomeOffset(
+      playerId, 
+      pawnIndex, 
+      playerCount, 
+      totalSize, 
+      pawnSize,
+    );
+    return Vector2(offset.dx, offset.dy);
   }
 
   @override
@@ -222,12 +292,72 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
     // Draw player home areas
     _drawPlayerHomeAreas(canvas);
+    
+    // Draw current player turn indicator arrow
+    _drawTurnIndicatorArrow(canvas);
 
     // Draw pawns on board (with animation positions)
     _drawBoardPawns(canvas);
     
     // Draw center pawns (finished pawns visible)
     _drawCenterPawns(canvas);
+  }
+  
+  /// Draw turn indicator pointing to current player's home area
+  void _drawTurnIndicatorArrow(Canvas canvas) {
+    final playerId = gameManager.currentPlayer.id;
+    final playerCount = gameManager.playerCount;
+    final color = IstoColors.getPlayerColor(playerId);
+    
+    // Get player's home position using new layout
+    final homePos = LayoutConfig.getHomePosition(playerId, playerCount, totalSize, 10.0);
+    final homeRect = homePos.rect;
+    
+    final arrowSize = 8.0;
+    
+    Path arrowPath;
+    Offset arrowTip;
+    
+    // Determine if player is on bottom or top based on home rect position
+    final isBottom = homeRect.top > totalSize / 2;
+    
+    if (isBottom) {
+      // Arrow points down toward bottom home area
+      arrowTip = Offset(homeRect.center.dx, homeRect.top - 5);
+      arrowPath = Path()
+        ..moveTo(arrowTip.dx, arrowTip.dy)
+        ..lineTo(arrowTip.dx - arrowSize, arrowTip.dy - arrowSize * 1.5)
+        ..lineTo(arrowTip.dx + arrowSize, arrowTip.dy - arrowSize * 1.5)
+        ..close();
+    } else {
+      // Arrow points up toward top home area  
+      arrowTip = Offset(homeRect.center.dx, homeRect.bottom + 5);
+      arrowPath = Path()
+        ..moveTo(arrowTip.dx, arrowTip.dy)
+        ..lineTo(arrowTip.dx - arrowSize, arrowTip.dy + arrowSize * 1.5)
+        ..lineTo(arrowTip.dx + arrowSize, arrowTip.dy + arrowSize * 1.5)
+        ..close();
+    }
+    
+    // Draw glow
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = color.withAlpha(100)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    
+    // Draw arrow
+    canvas.drawPath(arrowPath, Paint()..color = color);
+    
+    // Draw border
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = Colors.white.withAlpha(150)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   void _drawSquare(Canvas canvas, int row, int col) {
@@ -258,11 +388,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     if (isSafe || isCenter) {
       _drawDiagonalX(canvas, rect, isCenter);
     }
-    
-    // Draw direction arrow for start positions
-    if (isSafe && !isCenter) {
-      _drawDirectionArrow(canvas, rect, row, col);
-    }
   }
 
   void _drawDiagonalX(Canvas canvas, Rect rect, bool isCenter) {
@@ -284,133 +409,61 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     );
   }
 
-  void _drawDirectionArrow(Canvas canvas, Rect rect, int row, int col) {
-    final playerId = BoardConfig.getPlayerAtStart([row, col]);
-    if (playerId == null) return;
-    
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    
-    final center = rect.center;
-    final arrowSize = rect.width * 0.2;
-    
-    // Arrow direction based on player (clockwise movement)
-    Offset start, end;
-    switch (playerId) {
-      case 0: // Bottom - moves right
-        start = Offset(center.dx - arrowSize, center.dy + rect.height * 0.3);
-        end = Offset(center.dx + arrowSize, center.dy + rect.height * 0.3);
-        break;
-      case 1: // Top - moves left
-        start = Offset(center.dx + arrowSize, center.dy - rect.height * 0.3);
-        end = Offset(center.dx - arrowSize, center.dy - rect.height * 0.3);
-        break;
-      case 2: // Left - moves down
-        start = Offset(center.dx - rect.width * 0.3, center.dy - arrowSize);
-        end = Offset(center.dx - rect.width * 0.3, center.dy + arrowSize);
-        break;
-      case 3: // Right - moves up
-        start = Offset(center.dx + rect.width * 0.3, center.dy + arrowSize);
-        end = Offset(center.dx + rect.width * 0.3, center.dy - arrowSize);
-        break;
-      default:
-        return;
-    }
-    
-    canvas.drawLine(start, end, paint);
-    
-    // Arrow head
-    final angle = atan2(end.dy - start.dy, end.dx - start.dx);
-    final headLength = arrowSize * 0.5;
-    canvas.drawLine(
-      end,
-      Offset(
-        end.dx - headLength * cos(angle - 0.5),
-        end.dy - headLength * sin(angle - 0.5),
-      ),
-      paint,
-    );
-    canvas.drawLine(
-      end,
-      Offset(
-        end.dx - headLength * cos(angle + 0.5),
-        end.dy - headLength * sin(angle + 0.5),
-      ),
-      paint,
-    );
-  }
-
+  /// Draw player home areas using new 2-sided layout (bottom/top only)
   void _drawPlayerHomeAreas(Canvas canvas) {
-    final areaHeight = squareSize * 0.8;
-    final areaWidth = squareSize * 2.2;
-    final offset = 8.0;
+    final playerCount = gameManager.playerCount;
     
-    for (int playerId = 0; playerId < gameManager.playerCount; playerId++) {
-      Rect areaRect;
-      
-      switch (playerId) {
-        case 0: // Bottom
-          areaRect = Rect.fromLTWH(
-            (totalSize - areaWidth) / 2,
-            totalSize + offset,
-            areaWidth,
-            areaHeight,
-          );
-          break;
-        case 1: // Top
-          areaRect = Rect.fromLTWH(
-            (totalSize - areaWidth) / 2,
-            -areaHeight - offset,
-            areaWidth,
-            areaHeight,
-          );
-          break;
-        case 2: // Left
-          areaRect = Rect.fromLTWH(
-            -areaHeight - offset,
-            (totalSize - areaWidth) / 2,
-            areaHeight,
-            areaWidth,
-          );
-          break;
-        case 3: // Right
-          areaRect = Rect.fromLTWH(
-            totalSize + offset,
-            (totalSize - areaWidth) / 2,
-            areaHeight,
-            areaWidth,
-          );
-          break;
-        default:
-          continue;
-      }
-      
-      _drawPlayerHomeArea(canvas, areaRect, playerId);
+    for (int playerId = 0; playerId < playerCount; playerId++) {
+      final position = LayoutConfig.getHomePosition(playerId, playerCount, totalSize, 10.0);
+      _drawPlayerHomeArea(canvas, position.rect, playerId);
     }
   }
 
   void _drawPlayerHomeArea(Canvas canvas, Rect rect, int playerId) {
     final color = IstoColors.getPlayerColor(playerId);
+    final isCurrentPlayer = gameManager.currentPlayer.id == playerId;
     final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
+    
+    // Glow effect for current player
+    if (isCurrentPlayer) {
+      canvas.drawRRect(
+        rrect.inflate(3),
+        Paint()
+          ..color = color.withAlpha(120)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
+    }
     
     // Shadow
     canvas.drawRRect(
       rrect.shift(const Offset(2, 2)),
-      Paint()..color = Colors.black.withAlpha(40),
+      Paint()..color = Colors.black.withAlpha(60),
     );
     
-    // Background
+    // Background with gradient effect
     canvas.drawRRect(rrect, Paint()..color = color);
+    
+    // Inner highlight
+    final innerRRect = RRect.fromRectAndRadius(
+      rect.deflate(3), 
+      const Radius.circular(7),
+    );
+    canvas.drawRRect(
+      innerRRect,
+      Paint()..color = Colors.white.withAlpha(25),
+    );
+    
+    // Border - thicker for current player
     canvas.drawRRect(
       rrect,
       Paint()
-        ..color = Colors.white.withAlpha(60)
+        ..color = isCurrentPlayer ? Colors.white : Colors.white.withAlpha(60)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = isCurrentPlayer ? 2.5 : 1.5,
     );
+
+    // Draw player number label
+    _drawPlayerLabel(canvas, rect, playerId);
 
     // Draw home pawns
     final homePawns = gameManager.allPawns
@@ -419,28 +472,47 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
     if (homePawns.isEmpty) return;
 
-    final pawnDrawSize = pawnSize * 0.65;
+    final pawnDrawSize = pawnSize * 0.55;
     final innerRect = rect.deflate(6);
     
+    // All home areas are now horizontal (bottom/top sides)
     for (int i = 0; i < homePawns.length && i < 4; i++) {
       final pawn = homePawns[i];
-      double px, py;
-      
-      if (playerId == 0 || playerId == 1) {
-        // Horizontal layout
-        final cellW = innerRect.width / 4;
-        px = innerRect.left + cellW * i + cellW / 2 - pawnDrawSize / 2;
-        py = innerRect.center.dy - pawnDrawSize / 2;
-      } else {
-        // Vertical layout
-        final cellH = innerRect.height / 4;
-        px = innerRect.center.dx - pawnDrawSize / 2;
-        py = innerRect.top + cellH * i + cellH / 2 - pawnDrawSize / 2;
-      }
+      final cellW = innerRect.width / 4;
+      final px = innerRect.left + cellW * i + cellW / 2 - pawnDrawSize / 2;
+      final py = innerRect.center.dy - pawnDrawSize / 2;
       
       final isHighlighted = _highlightedPawns.contains(pawn.id);
-      _drawPawn(canvas, Offset(px, py), pawn, pawnDrawSize, isHighlighted);
+      _drawPawn(canvas, Offset(px, py), pawn, pawnDrawSize, isHighlighted, 1.0, 0.0);
     }
+  }
+  
+  void _drawPlayerLabel(Canvas canvas, Rect rect, int playerId) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: 'P${playerId + 1}',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              color: Colors.black54,
+              blurRadius: 2,
+              offset: Offset(1, 1),
+            ),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    
+    // All home areas are now horizontal - label at top-left corner
+    final labelX = rect.left + 4;
+    final labelY = rect.top + 2;
+    
+    textPainter.paint(canvas, Offset(labelX, labelY));
   }
 
   void _drawBoardPawns(Canvas canvas) {
@@ -467,28 +539,41 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       final col = int.parse(parts[1]);
       final pawns = entry.value;
       
-      // Use animated position if available
-      Vector2 center;
-      if (pawns.length == 1 && _pawnPositions.containsKey(pawns[0].id)) {
-        center = _pawnPositions[pawns[0].id]!;
-      } else {
-        center = _getSquareCenter(row, col);
-      }
-      
       final drawSize = pawnSize * 0.7;
       
       if (pawns.length == 1) {
         final pawn = pawns[0];
         final isHighlighted = _highlightedPawns.contains(pawn.id);
+        
+        // Get animated position with hop offset
+        Vector2 baseCenter;
+        double hopOffset = 0.0;
+        double scale = 1.0;
+        double rotation = 0.0;
+        
+        if (_pawnPositions.containsKey(pawn.id)) {
+          baseCenter = _pawnPositions[pawn.id]!;
+          final animType = _pawnAnimationType[pawn.id] ?? PawnAnimationType.move;
+          final phase = _pawnAnimationPhase[pawn.id] ?? 0.0;
+          hopOffset = _getHopOffset(phase, animType);
+          scale = _pawnScale[pawn.id] ?? 1.0;
+          rotation = _pawnRotation[pawn.id] ?? 0.0;
+        } else {
+          baseCenter = _getSquareCenter(row, col);
+        }
+        
         _drawPawn(
           canvas,
-          Offset(center.x - drawSize / 2, center.y - drawSize / 2),
+          Offset(baseCenter.x - drawSize / 2, baseCenter.y - drawSize / 2 + hopOffset),
           pawn,
           drawSize,
           isHighlighted,
+          scale,
+          rotation,
         );
       } else {
-        // Stack multiple pawns in 2x2 grid
+        // Stack multiple pawns in 2x2 grid (no animation for stacked)
+        final center = _getSquareCenter(row, col);
         for (int i = 0; i < pawns.length && i < 4; i++) {
           final pawn = pawns[i];
           final offsetX = ((i % 2) - 0.5) * drawSize * 0.5;
@@ -503,6 +588,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
             pawn,
             drawSize * 0.6,
             isHighlighted,
+            1.0,
+            0.0,
           );
         }
       }
@@ -530,14 +617,25 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       final px = center.dx + radius * cos(angle) - drawSize / 2;
       final py = center.dy + radius * sin(angle) - drawSize / 2;
       
-      _drawPawn(canvas, Offset(px, py), pawn, drawSize, false);
+      _drawPawn(canvas, Offset(px, py), pawn, drawSize, false, 1.0, 0.0);
     }
   }
 
-  void _drawPawn(Canvas canvas, Offset topLeft, Pawn pawn, double size, bool isHighlighted) {
+  /// Draw a pawn with optional scale and rotation for animations
+  void _drawPawn(Canvas canvas, Offset topLeft, Pawn pawn, double size, bool isHighlighted, [double scale = 1.0, double rotation = 0.0]) {
     final color = IstoColors.getPlayerColor(pawn.playerId);
+    final scaledSize = size * scale;
     final center = Offset(topLeft.dx + size / 2, topLeft.dy + size / 2);
-    final radius = size / 2;
+    final radius = scaledSize / 2;
+    
+    canvas.save();
+    
+    // Apply rotation for capture animation
+    if (rotation != 0) {
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(rotation);
+      canvas.translate(-center.dx, -center.dy);
+    }
     
     // Highlight glow (pulsing effect)
     if (isHighlighted) {
@@ -545,14 +643,14 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         center,
         radius + 5,
         Paint()
-          ..color = Colors.yellow.withAlpha(180)
+          ..color = IstoColors.highlight.withAlpha(180)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
       );
       canvas.drawCircle(
         center,
         radius + 2,
         Paint()
-          ..color = Colors.yellow
+          ..color = IstoColors.highlight
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
@@ -589,6 +687,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
+    
+    canvas.restore();
   }
 
   void _drawStar(Canvas canvas, Offset center, double radius) {
@@ -618,11 +718,15 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
   @override
   bool containsLocalPoint(Vector2 point) {
-    final expand = squareSize * 2;
-    return point.x >= -expand &&
-           point.x <= totalSize + expand &&
-           point.y >= -expand &&
-           point.y <= totalSize + expand;
+    // Expand bounds to include home areas above and below the board
+    // Home areas can be at y = -boardSize*0.16 - 10 (approximately -100)
+    // and below at y = boardSize + 10 + boardSize*0.16
+    final expandX = squareSize * 2;
+    final expandY = totalSize * 0.25; // 25% of board size for home areas
+    return point.x >= -expandX &&
+           point.x <= totalSize + expandX &&
+           point.y >= -expandY &&
+           point.y <= totalSize + expandY;
   }
 
   @override
@@ -684,43 +788,11 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     }
   }
 
+  /// Get home area rect using LayoutConfig for correct 2-sided positioning
   Rect _getPlayerHomeRect(int playerId) {
-    final areaHeight = squareSize * 0.8;
-    final areaWidth = squareSize * 2.2;
-    final offset = 8.0;
-    
-    switch (playerId) {
-      case 0: // Bottom
-        return Rect.fromLTWH(
-          (totalSize - areaWidth) / 2,
-          totalSize + offset,
-          areaWidth,
-          areaHeight,
-        );
-      case 1: // Top
-        return Rect.fromLTWH(
-          (totalSize - areaWidth) / 2,
-          -areaHeight - offset,
-          areaWidth,
-          areaHeight,
-        );
-      case 2: // Left
-        return Rect.fromLTWH(
-          -areaHeight - offset,
-          (totalSize - areaWidth) / 2,
-          areaHeight,
-          areaWidth,
-        );
-      case 3: // Right
-        return Rect.fromLTWH(
-          totalSize + offset,
-          (totalSize - areaWidth) / 2,
-          areaHeight,
-          areaWidth,
-        );
-      default:
-        return Rect.zero;
-    }
+    final playerCount = gameManager.playerCount;
+    final position = LayoutConfig.getHomePosition(playerId, playerCount, totalSize, 10.0);
+    return position.rect;
   }
 
   void highlightValidPawns(List<Pawn> pawns) {
