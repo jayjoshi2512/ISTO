@@ -120,28 +120,27 @@ class AudioService {
     await _playSound('enter');
   }
 
-  /// Play capture/kill sound - dramatic
+  /// Play capture/kill sound - DRAMATIC using blocked for sharp impact
   Future<void> playCapture() async {
-    // Use move sound as fallback if capture.mp3 doesn't exist
-    await _playSound('move');
+    await _playSound('blocked');
   }
 
-  /// Play CHOWKA (4) or ASHTA (8) sound - victory fanfare
+  /// Play CHOWKA (4) or ASHTA (8) sound - celebratory roll
   Future<void> playGraceThrow() async {
     await _playSound('roll');
   }
 
-  /// Play extra turn notification
+  /// Play extra turn notification - celebratory
   Future<void> playExtraTurn() async {
-    await _playSound('tap');
+    await _playSound('roll');
   }
 
-  /// Play pawn reaching home/center
+  /// Play pawn reaching home/center - triumphant
   Future<void> playPawnFinish() async {
     await _playSound('enter');
   }
 
-  /// Play win/victory sound
+  /// Play win/victory sound - triumphant
   Future<void> playWin() async {
     await _playSound('enter');
   }

@@ -215,6 +215,8 @@ class GameManager {
     // Check if this pawn is stacked ON INNER PATH and needs dialog
     final stackedPawns = getStackedPawns(pawn);
     if (stackedPawns.length > 1 && isPawnOnInnerPath(pawn) && movePawnCount == 1) {
+      // Audio signal for stacked pawn choice dialog
+      feedbackService.mediumTap();
       // Ask user how many pawns to move - callback to UI
       onStackedPawnChoice?.call(pawn, stackedPawns.length);
       return MoveResult.failed('Waiting for stacked pawn choice');

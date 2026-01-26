@@ -68,12 +68,14 @@ class FeedbackService {
     await _audio.playRollSound();
   }
 
-  /// Called when rolling CHOWKA (4) or ASHTA (8)
+  /// Called when rolling CHOWKA (4) or ASHTA (8) - GRACE THROW CELEBRATION
   Future<void> onGraceThrow() async {
     await heavyTap();
     await _audio.playGraceThrow();
-    // Double tap for emphasis
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Triple-tap for emphasis on this celebratory moment
+    await Future.delayed(const Duration(milliseconds: 80));
+    await mediumTap();
+    await Future.delayed(const Duration(milliseconds: 80));
     await mediumTap();
   }
 
@@ -95,7 +97,7 @@ class FeedbackService {
     await _audio.playPawnEnter();
   }
 
-  /// Called when an opponent pawn is captured
+  /// Called when an opponent pawn is captured - DRAMATIC
   Future<void> onCapture() async {
     await heavyTap();
     await _audio.playCapture();
@@ -128,12 +130,13 @@ class FeedbackService {
     await _audio.playTurnChange();
   }
 
-  /// Called when extra turn is granted
+  /// Called when extra turn is granted - CELEBRATORY
   Future<void> onExtraTurn() async {
     await mediumTap();
     await _audio.playExtraTurn();
+    // Two taps to celebrate getting another turn
     await Future.delayed(const Duration(milliseconds: 50));
-    await lightTap();
+    await mediumTap();
   }
 
   /// Called on invalid move attempt

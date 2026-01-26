@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
@@ -40,9 +42,10 @@ class _GameToastOverlayState extends State<GameToastOverlay>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -0.5),
@@ -89,14 +92,9 @@ class _GameToastOverlayState extends State<GameToastOverlay>
         decoration: BoxDecoration(
           color: DesignSystem.surface,
           borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
-          border: Border.all(
-            color: widget.color.withAlpha(100),
-          ),
+          border: Border.all(color: widget.color.withAlpha(100)),
           boxShadow: [
-            BoxShadow(
-              color: widget.color.withAlpha(40),
-              blurRadius: 16,
-            ),
+            BoxShadow(color: widget.color.withAlpha(40), blurRadius: 16),
             BoxShadow(
               color: Colors.black.withAlpha(60),
               blurRadius: 12,
@@ -108,11 +106,7 @@ class _GameToastOverlayState extends State<GameToastOverlay>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (widget.icon != null) ...[
-              Icon(
-                widget.icon,
-                color: widget.color,
-                size: 18,
-              ),
+              Icon(widget.icon, color: widget.color, size: 18),
               const SizedBox(width: 10),
             ],
             Text(
@@ -129,7 +123,7 @@ class _GameToastOverlayState extends State<GameToastOverlay>
   }
 }
 
-/// Extra turn notification overlay
+/// Enhanced extra turn notification - more prominent and celebratory
 class ExtraTurnOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -140,25 +134,41 @@ class ExtraTurnOverlay extends StatefulWidget {
 }
 
 class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+
+    // Main entrance animation
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+
+    // Pulsing glow animation
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    // Longer display duration for visibility
+    Future.delayed(const Duration(milliseconds: 2200), () {
       if (mounted) {
         _controller.reverse().then((_) {
           widget.game.overlays.remove('extraTurn');
@@ -170,51 +180,106 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
   @override
   void dispose() {
     _controller.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_controller, _pulseController]),
       builder: (context, child) {
         return Positioned(
-          top: MediaQuery.of(context).padding.top + 80,
+          // More central positioning for visibility
+          top: MediaQuery.of(context).size.height * 0.35,
           left: 32,
           right: 32,
           child: Center(
             child: Transform.scale(
               scale: _scaleAnimation.value,
               child: Opacity(
-                opacity: _controller.value,
+                opacity: _controller.value.clamp(0.0, 1.0),
                 child: child,
               ),
             ),
           ),
         );
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: DesignSystem.goldGradient,
-          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
-          boxShadow: DesignSystem.glowGold,
-        ),
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+            decoration: BoxDecoration(
+              gradient: DesignSystem.goldGradient,
+              borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+              boxShadow: [
+                // Pulsing outer glow
+                BoxShadow(
+                  color: DesignSystem.accentGold.withAlpha(
+                    (80 * _pulseAnimation.value).toInt(),
+                  ),
+                  blurRadius: 24 * _pulseAnimation.value,
+                  spreadRadius: 4 * _pulseAnimation.value,
+                ),
+                // Inner glow
+                BoxShadow(
+                  color: const Color(0xFFE5C158).withAlpha(100),
+                  blurRadius: 16,
+                ),
+                // Drop shadow for depth
+                BoxShadow(
+                  color: Colors.black.withAlpha(80),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: child,
+          );
+        },
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.auto_awesome,
-              color: Color(0xFF1A1025),
-              size: 20,
+            // Animated star icon
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 600),
+              builder: (context, value, child) {
+                return Transform.rotate(
+                  angle: value * 0.5,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: DesignSystem.bgDark.withAlpha((255 * value).toInt()),
+                    size: 24,
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Text(
               'EXTRA TURN!',
               style: DesignSystem.button.copyWith(
                 color: DesignSystem.bgDark,
-                letterSpacing: 2,
+                fontSize: 16,
+                letterSpacing: 3,
+                fontWeight: FontWeight.w800,
               ),
+            ),
+            const SizedBox(width: 12),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 600),
+              builder: (context, value, child) {
+                return Transform.rotate(
+                  angle: -value * 0.5,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: DesignSystem.bgDark.withAlpha((255 * value).toInt()),
+                    size: 24,
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -234,25 +299,36 @@ class CaptureOverlay extends StatefulWidget {
 }
 
 class _CaptureOverlayState extends State<CaptureOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _shakeController;
   late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
+
+    // Main animation
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    _scaleAnimation = Tween<double>(
+      begin: 0.6,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+
+    // Quick shake for impact
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
     );
 
     _controller.forward();
+    _shakeController.forward();
 
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 1800), () {
       if (mounted) {
         _controller.reverse().then((_) {
           widget.game.overlays.remove('capture');
@@ -264,56 +340,99 @@ class _CaptureOverlayState extends State<CaptureOverlay>
   @override
   void dispose() {
     _controller.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_controller, _shakeController]),
       builder: (context, child) {
+        // Calculate shake offset
+        double shakeOffset = 0;
+        if (_shakeController.isAnimating && _shakeController.value < 0.6) {
+          final shakePhase = _shakeController.value / 0.6;
+          shakeOffset = sin(shakePhase * 3.14159 * 6) * (1 - shakePhase) * 8;
+        }
+
         return Positioned(
-          top: MediaQuery.of(context).padding.top + 80,
+          // More central for visibility
+          top: MediaQuery.of(context).size.height * 0.35,
           left: 32,
           right: 32,
           child: Center(
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Opacity(
-                opacity: _controller.value,
-                child: child,
+            child: Transform.translate(
+              offset: Offset(shakeOffset, 0),
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Opacity(
+                  opacity: _controller.value.clamp(0.0, 1.0),
+                  child: child,
+                ),
               ),
             ),
           ),
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE53935),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF5252), Color(0xFFE53935), Color(0xFFD32F2F)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
           boxShadow: [
+            // Dramatic red glow
             BoxShadow(
-              color: const Color(0xFFE53935).withAlpha(80),
-              blurRadius: 16,
-              spreadRadius: 2,
+              color: const Color(0xFFE53935).withAlpha(150),
+              blurRadius: 24,
+              spreadRadius: 4,
+            ),
+            BoxShadow(
+              color: const Color(0xFFFF5252).withAlpha(80),
+              blurRadius: 40,
+              spreadRadius: 0,
+            ),
+            // Drop shadow
+            BoxShadow(
+              color: Colors.black.withAlpha(80),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.flash_on,
-              color: Colors.white,
-              size: 20,
+            // Lightning bolt icon with animation
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 300),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: 0.5 + value * 0.5,
+                  child: Icon(
+                    Icons.flash_on,
+                    color: Colors.white.withAlpha((255 * value).toInt()),
+                    size: 24,
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Text(
               'CAPTURED!',
               style: DesignSystem.button.copyWith(
                 color: Colors.white,
-                letterSpacing: 2,
+                fontSize: 16,
+                letterSpacing: 3,
+                fontWeight: FontWeight.w800,
+                shadows: [
+                  Shadow(color: Colors.black.withAlpha(100), blurRadius: 4),
+                ],
               ),
             ),
           ],
@@ -370,10 +489,7 @@ class _NoMovesOverlayState extends State<NoMovesOverlay>
           left: 32,
           right: 32,
           child: Center(
-            child: Opacity(
-              opacity: _controller.value,
-              child: child,
-            ),
+            child: Opacity(opacity: _controller.value, child: child),
           ),
         );
       },
@@ -384,20 +500,13 @@ class _NoMovesOverlayState extends State<NoMovesOverlay>
           borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
           border: Border.all(color: Colors.orange.withAlpha(150)),
           boxShadow: [
-            BoxShadow(
-              color: Colors.orange.withAlpha(40),
-              blurRadius: 12,
-            ),
+            BoxShadow(color: Colors.orange.withAlpha(40), blurRadius: 12),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.block,
-              color: Colors.orange,
-              size: 18,
-            ),
+            Icon(Icons.block, color: Colors.orange, size: 18),
             const SizedBox(width: 10),
             Text(
               'No valid moves',

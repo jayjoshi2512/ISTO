@@ -108,8 +108,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     if (!_isAnimating) return;
     
     bool stillAnimating = false;
-    // Base speed - time to move one square
-    final baseSpeed = squareSize * 3.0;
+    // Faster base speed for snappier feel
+    final baseSpeed = squareSize * 4.0;
     
     for (final pawnId in _pawnPaths.keys.toList()) {
       final path = _pawnPaths[pawnId]!;
@@ -117,14 +117,19 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       final animType = _pawnAnimationType[pawnId] ?? PawnAnimationType.move;
       
       if (pathIndex >= path.length) {
-        // Animation complete - cleanup
-        _pawnPaths.remove(pawnId);
-        _pawnPathIndex.remove(pawnId);
-        _pawnAnimationType.remove(pawnId);
-        _pawnAnimationPhase.remove(pawnId);
-        _pawnScale.remove(pawnId);
-        _pawnRotation.remove(pawnId);
-        _pawnPositions.remove(pawnId); // Clear position so it uses real position
+        // Animation complete - add landing settle effect
+        _pawnAnimationPhase[pawnId] = 1.0;  // Mark as landed for squash
+        
+        // Quick cleanup after settle
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _pawnPaths.remove(pawnId);
+          _pawnPathIndex.remove(pawnId);
+          _pawnAnimationType.remove(pawnId);
+          _pawnAnimationPhase.remove(pawnId);
+          _pawnScale.remove(pawnId);
+          _pawnRotation.remove(pawnId);
+          _pawnPositions.remove(pawnId);
+        });
         continue;
       }
       
@@ -143,19 +148,26 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       // Phase is tied to progress - one complete hop per square
       _pawnAnimationPhase[pawnId] = progress;
       
-      // Speed varies by animation type
-      final speed = animType == PawnAnimationType.captured 
-          ? baseSpeed * 1.5 
-          : baseSpeed;
+      // Speed varies by animation type - eased for natural feel
+      double speed;
+      if (animType == PawnAnimationType.captured) {
+        speed = baseSpeed * 1.8;
+      } else {
+        // Ease out - starts fast, slows at end
+        final easeProgress = 1 - pow(1 - progress, 2).toDouble();
+        speed = baseSpeed * (0.8 + easeProgress * 0.4);
+      }
       
-      // Handle capture animation (spin + shrink)
+      // Handle capture animation (faster spin + more dramatic shrink)
       if (animType == PawnAnimationType.captured) {
         var rotation = _pawnRotation[pawnId] ?? 0.0;
-        rotation += dt * 12.0;
+        rotation += dt * 18.0;  // Faster spin
         _pawnRotation[pawnId] = rotation;
         
         final overallProgress = pathIndex / path.length.toDouble();
-        _pawnScale[pawnId] = 1.0 - (overallProgress * 0.5);
+        // More dramatic shrink with bounce
+        final shrinkProgress = pow(overallProgress, 0.7).toDouble();
+        _pawnScale[pawnId] = 1.0 - (shrinkProgress * 0.6);
       }
       
       final diff = targetPos - currentPos;
@@ -168,7 +180,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         _pawnAnimationPhase[pawnId] = 0.0;
         stillAnimating = true;
       } else {
-        // Move towards target
+        // Move towards target with easing
         final move = diff.normalized() * speed * dt;
         _pawnPositions[pawnId] = currentPos + move;
         stillAnimating = true;
@@ -178,12 +190,40 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     _isAnimating = stillAnimating;
   }
   
-  /// Get hop offset for bouncy animation - one hop per square
+  /// Enhanced hop offset with squash and stretch feel
   double _getHopOffset(double phase, PawnAnimationType type) {
     if (type == PawnAnimationType.captured) return 0;
-    // Parabolic hop: peaks at phase 0.5 (middle of square traversal)
-    final hopHeight = 10.0;
-    return -hopHeight * sin(phase * pi);
+    
+    // Increased hop height for more visible bounce
+    final hopHeight = squareSize * 0.18;  // Relative to square for consistency
+    
+    // Asymmetric hop - faster up, slower down (more satisfying)
+    // Peak at 0.4 instead of 0.5 for snappier feel
+    final adjustedPhase = phase < 0.4 
+        ? phase / 0.4  // Fast rise to peak
+        : 1 - ((phase - 0.4) / 0.6);  // Slower fall
+    
+    return -hopHeight * sin(adjustedPhase * pi);
+  }
+  
+  /// Get scale factor for squash-and-stretch during hop
+  double _getHopScale(double phase, PawnAnimationType type) {
+    if (type == PawnAnimationType.captured) return 1.0;
+    if (type == PawnAnimationType.finish) return 1.0;
+    
+    // Subtle squash and stretch
+    if (phase < 0.15) {
+      // Launch - slight squash before jump
+      return 0.92 + (phase / 0.15) * 0.08;
+    } else if (phase < 0.4) {
+      // Rising - stretch vertically
+      return 1.0 + (sin((phase - 0.15) / 0.25 * pi / 2)) * 0.08;
+    } else if (phase > 0.85) {
+      // Landing - squash on impact
+      final landPhase = (phase - 0.85) / 0.15;
+      return 1.0 - sin(landPhase * pi) * 0.12;
+    }
+    return 1.0;
   }
 
   /// Start pawn movement animation through path with hopping
@@ -545,18 +585,20 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         final pawn = pawns[0];
         final isHighlighted = _highlightedPawns.contains(pawn.id);
         
-        // Get animated position with hop offset
+        // Get animated position with hop offset and squash-stretch
         Vector2 baseCenter;
         double hopOffset = 0.0;
         double scale = 1.0;
         double rotation = 0.0;
+        double hopScale = 1.0;  // For squash-stretch effect
         
         if (_pawnPositions.containsKey(pawn.id)) {
           baseCenter = _pawnPositions[pawn.id]!;
           final animType = _pawnAnimationType[pawn.id] ?? PawnAnimationType.move;
           final phase = _pawnAnimationPhase[pawn.id] ?? 0.0;
           hopOffset = _getHopOffset(phase, animType);
-          scale = _pawnScale[pawn.id] ?? 1.0;
+          hopScale = _getHopScale(phase, animType);
+          scale = (_pawnScale[pawn.id] ?? 1.0) * hopScale;
           rotation = _pawnRotation[pawn.id] ?? 0.0;
         } else {
           baseCenter = _getSquareCenter(row, col);
