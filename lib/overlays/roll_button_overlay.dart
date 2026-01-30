@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
 import '../config/animation_config.dart';
+import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
 
@@ -13,6 +14,7 @@ import '../services/feedback_service.dart';
 /// - Press-and-hold charge up effect (anticipation)
 /// - Shake animation on press (tactile feedback)
 /// - Glow intensification during interaction
+/// - Configurable intensity via GameFeelConfig
 class RollButtonOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -38,11 +40,18 @@ class _RollButtonOverlayState extends State<RollButtonOverlay>
     
     // Breathing pulse animation - draws player attention
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1800),
+      duration: GameFeelConfig.idleBreathingDuration,
       vsync: this,
-    )..repeat(reverse: true);
+    );
+    
+    if (GameFeelConfig.idleBreathingEnabled) {
+      _pulseController.repeat(reverse: true);
+    }
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.06).animate(
+    _pulseAnimation = Tween<double>(
+      begin: 1.0, 
+      end: 1.0 + (0.06 * GameFeelConfig.animationIntensity),
+    ).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     

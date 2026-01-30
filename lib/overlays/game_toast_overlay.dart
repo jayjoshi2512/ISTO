@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
+import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
 
 /// Clean, minimal toast notifications for game events
@@ -288,7 +289,7 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
   }
 }
 
-/// Capture notification overlay
+/// Capture notification overlay with dramatic game feel
 class CaptureOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -302,31 +303,59 @@ class _CaptureOverlayState extends State<CaptureOverlay>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _shakeController;
+  late AnimationController _flashController;
+  late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    // Main animation
+    // Main animation with game feel config
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 350),
+      duration: Duration(milliseconds: (350 * GameFeelConfig.animationIntensity).toInt()),
       vsync: this,
     );
 
     _scaleAnimation = Tween<double>(
-      begin: 0.6,
+      begin: 0.5,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     // Quick shake for impact
     _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: GameFeelConfig.captureShakeDuration,
+      vsync: this,
+    );
+    
+    // Screen flash for drama
+    _flashController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    
+    // Pulsing glow
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
     _controller.forward();
     _shakeController.forward();
+    
+    if (GameFeelConfig.captureFlashEnabled) {
+      _flashController.forward();
+    }
+    
+    // Start pulsing after entrance
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        _pulseController.repeat(reverse: true);
+      }
+    });
+    
+    // Trigger board shake
+    widget.game.boardComponent.triggerShake();
 
     Future.delayed(const Duration(milliseconds: 1800), () {
       if (mounted) {
@@ -341,102 +370,129 @@ class _CaptureOverlayState extends State<CaptureOverlay>
   void dispose() {
     _controller.dispose();
     _shakeController.dispose();
+    _flashController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_controller, _shakeController]),
+      animation: Listenable.merge([_controller, _shakeController, _flashController, _pulseController]),
       builder: (context, child) {
-        // Calculate shake offset
+        // Calculate shake offset with game feel config
         double shakeOffset = 0;
-        if (_shakeController.isAnimating && _shakeController.value < 0.6) {
+        if (GameFeelConfig.captureShakeEnabled && _shakeController.isAnimating && _shakeController.value < 0.6) {
           final shakePhase = _shakeController.value / 0.6;
-          shakeOffset = sin(shakePhase * 3.14159 * 6) * (1 - shakePhase) * 8;
+          shakeOffset = sin(shakePhase * 3.14159 * 6) * (1 - shakePhase) * GameFeelConfig.captureShakeMagnitude;
         }
+        
+        // Pulse effect for glow
+        final pulseValue = 0.7 + 0.3 * (_pulseController.value);
 
-        return Positioned(
-          // More central for visibility
-          top: MediaQuery.of(context).size.height * 0.35,
-          left: 32,
-          right: 32,
-          child: Center(
-            child: Transform.translate(
-              offset: Offset(shakeOffset, 0),
-              child: Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Opacity(
-                  opacity: _controller.value.clamp(0.0, 1.0),
-                  child: child,
+        return Stack(
+          children: [
+            // Screen flash overlay
+            if (GameFeelConfig.captureFlashEnabled && _flashController.isAnimating)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: GameFeelConfig.killTargetColor.withAlpha(
+                      (GameFeelConfig.captureFlashAlpha * (1 - _flashController.value)).toInt(),
+                    ),
+                  ),
+                ),
+              ),
+            
+            // Main capture badge
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.35,
+              left: 32,
+              right: 32,
+              child: Center(
+                child: Transform.translate(
+                  offset: Offset(shakeOffset, 0),
+                  child: Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: Opacity(
+                      opacity: _controller.value.clamp(0.0, 1.0),
+                      child: _buildCaptureBadge(pulseValue),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         );
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF5252), Color(0xFFE53935), Color(0xFFD32F2F)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
-          boxShadow: [
-            // Dramatic red glow
-            BoxShadow(
-              color: const Color(0xFFE53935).withAlpha(150),
-              blurRadius: 24,
-              spreadRadius: 4,
-            ),
-            BoxShadow(
-              color: const Color(0xFFFF5252).withAlpha(80),
-              blurRadius: 40,
-              spreadRadius: 0,
-            ),
-            // Drop shadow
-            BoxShadow(
-              color: Colors.black.withAlpha(80),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    );
+  }
+  
+  Widget _buildCaptureBadge(double pulseValue) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF5252), Color(0xFFE53935), Color(0xFFD32F2F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Lightning bolt icon with animation
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 300),
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: 0.5 + value * 0.5,
+        borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+        boxShadow: [
+          // Dramatic red glow - pulsing with game feel
+          BoxShadow(
+            color: GameFeelConfig.killTargetColor.withAlpha((150 * pulseValue * GameFeelConfig.glowIntensity).toInt()),
+            blurRadius: 24 + (8 * pulseValue),
+            spreadRadius: 4 * pulseValue,
+          ),
+          BoxShadow(
+            color: const Color(0xFFFF5252).withAlpha((80 * GameFeelConfig.glowIntensity).toInt()),
+            blurRadius: 40,
+            spreadRadius: 0,
+          ),
+          // Drop shadow
+          BoxShadow(
+            color: Colors.black.withAlpha(80),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Lightning bolt icon with animation
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 300),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: 0.5 + value * 0.5,
+                child: Transform.rotate(
+                  angle: (1 - value) * 0.3,
                   child: Icon(
                     Icons.flash_on,
                     color: Colors.white.withAlpha((255 * value).toInt()),
                     size: 24,
                   ),
-                );
-              },
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'CAPTURED!',
+            style: DesignSystem.button.copyWith(
+              color: Colors.white,
+              fontSize: 16,
+              letterSpacing: 3,
+              fontWeight: FontWeight.w800,
+              shadows: [
+                Shadow(color: Colors.black.withAlpha(100), blurRadius: 4),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(
-              'CAPTURED!',
-              style: DesignSystem.button.copyWith(
-                color: Colors.white,
-                fontSize: 16,
-                letterSpacing: 3,
-                fontWeight: FontWeight.w800,
-                shadows: [
-                  Shadow(color: Colors.black.withAlpha(100), blurRadius: 4),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

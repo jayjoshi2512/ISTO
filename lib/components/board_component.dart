@@ -7,6 +7,7 @@ import '../config/board_config.dart';
 import '../config/design_system.dart';
 import '../config/player_colors.dart';
 import '../config/layout_config.dart';
+import '../config/game_feel_config.dart';
 import '../models/models.dart';
 import '../game/game_manager.dart';
 
@@ -51,7 +52,7 @@ enum PawnAnimationType {
   finish,    // Reaching center - celebration
 }
 
-/// Main board component - renders 5x5 ISTO board
+/// Main board component - renders 5x5 ISTO board with enhanced game feel
 class BoardComponent extends PositionComponent with TapCallbacks {
   final GameManager gameManager;
   final double squareSize;
@@ -69,6 +70,19 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   bool _isAnimating = false;
 
   final Set<String> _highlightedPawns = {};
+  
+  // Game feel state - valid move squares to highlight
+  final Set<String> _highlightedSquares = {};
+  final Map<String, bool> _killTargetSquares = {};
+  
+  // Ambient animation state
+  double _breathePhase = 0.0;
+  double _highlightPulsePhase = 0.0;
+  
+  // Screen shake state for capture impacts
+  double _shakeOffsetX = 0.0;
+  double _shakeOffsetY = 0.0;
+  double _shakeIntensity = 0.0;
 
   BoardComponent({
     required Vector2 position,
@@ -102,6 +116,43 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   void update(double dt) {
     super.update(dt);
     _updatePawnAnimations(dt);
+    _updateAmbientAnimations(dt);
+    _updateShakeEffect(dt);
+  }
+  
+  /// Update ambient breathing and pulse animations for game feel
+  void _updateAmbientAnimations(double dt) {
+    // Board breathing (very subtle)
+    if (GameFeelConfig.boardBreathingEnabled) {
+      _breathePhase += dt * 0.5;  // Slow, relaxing cycle
+      if (_breathePhase > 2 * pi) _breathePhase -= 2 * pi;
+    }
+    
+    // Highlighted square pulse
+    if (_highlightedSquares.isNotEmpty || _highlightedPawns.isNotEmpty) {
+      _highlightPulsePhase += dt * GameFeelConfig.pawnPulseSpeed;
+      if (_highlightPulsePhase > 2 * pi) _highlightPulsePhase -= 2 * pi;
+    }
+  }
+  
+  /// Update screen shake effect (decay over time)
+  void _updateShakeEffect(double dt) {
+    if (_shakeIntensity > 0.01) {
+      _shakeIntensity *= 0.85;  // Quick decay
+      _shakeOffsetX = (Random().nextDouble() - 0.5) * 2 * _shakeIntensity;
+      _shakeOffsetY = (Random().nextDouble() - 0.5) * 2 * _shakeIntensity;
+    } else {
+      _shakeIntensity = 0;
+      _shakeOffsetX = 0;
+      _shakeOffsetY = 0;
+    }
+  }
+  
+  /// Trigger screen shake for impact moments (captures)
+  void triggerShake([double intensity = 1.0]) {
+    if (GameFeelConfig.captureShakeEnabled) {
+      _shakeIntensity = GameFeelConfig.captureShakeMagnitude * intensity;
+    }
   }
 
   void _updatePawnAnimations(double dt) {
@@ -310,18 +361,37 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   void render(Canvas canvas) {
     super.render(canvas);
     
+    // Apply screen shake offset for impact moments
+    canvas.save();
+    canvas.translate(_shakeOffsetX, _shakeOffsetY);
+    
     // Board background with rounded corners
     final boardRect = Rect.fromLTWH(-8, -8, totalSize + 16, totalSize + 16);
     final boardRRect = RRect.fromRectAndRadius(boardRect, const Radius.circular(12));
     
-    // Shadow
+    // Enhanced shadow with game feel config
+    final shadowBlur = GameFeelConfig.boardShadowBlur;
+    final shadowAlpha = GameFeelConfig.boardShadowAlpha;
     canvas.drawRRect(
       boardRRect.shift(const Offset(3, 4)),
       Paint()
-        ..color = Colors.black.withAlpha(100)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..color = Colors.black.withAlpha(shadowAlpha)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, shadowBlur),
     );
     canvas.drawRRect(boardRRect, Paint()..color = IstoColors.boardBackground);
+    
+    // Ambient glow from current player color (subtle)
+    if (GameFeelConfig.ambientGlowEnabled) {
+      final playerColor = IstoColors.getPlayerColor(gameManager.currentPlayer.id);
+      final breatheFactor = 0.5 + 0.5 * sin(_breathePhase);
+      final glowAlpha = (20 * GameFeelConfig.ambientGlowIntensity * breatheFactor).toInt();
+      canvas.drawRRect(
+        boardRRect,
+        Paint()
+          ..color = playerColor.withAlpha(glowAlpha)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20),
+      );
+    }
     
     // Draw all 25 squares
     for (int row = 0; row < 5; row++) {
@@ -341,6 +411,37 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     
     // Draw center pawns (finished pawns visible)
     _drawCenterPawns(canvas);
+    
+    // Restore canvas after shake offset
+    canvas.restore();
+    
+    // Draw subtle vignette overlay for depth
+    if (GameFeelConfig.vignetteIntensity > 0) {
+      _drawVignette(canvas, boardRect);
+    }
+  }
+  
+  /// Draw a subtle vignette overlay for depth and focus
+  void _drawVignette(Canvas canvas, Rect rect) {
+    final center = rect.center;
+    final maxRadius = rect.longestSide * 0.8;
+    
+    final gradient = RadialGradient(
+      center: Alignment.center,
+      radius: 1.0,
+      colors: [
+        Colors.transparent,
+        Colors.black.withAlpha((255 * GameFeelConfig.vignetteIntensity).toInt()),
+      ],
+      stops: const [0.6, 1.0],
+    );
+    
+    final paint = Paint()
+      ..shader = gradient.createShader(
+        Rect.fromCircle(center: center, radius: maxRadius),
+      );
+    
+    canvas.drawRect(rect, paint);
   }
   
   /// Draw turn indicator pointing to current player's home area
@@ -406,6 +507,9 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     
     final isCenter = BoardConfig.isCenter([row, col]);
     final isSafe = BoardConfig.isSafeSquare([row, col]);
+    final squareKey = '$row,$col';
+    final isValidMove = _highlightedSquares.contains(squareKey);
+    final isKillTarget = _killTargetSquares[squareKey] ?? false;
     
     Color bgColor;
     if (isCenter || isSafe) {
@@ -414,15 +518,53 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       bgColor = IstoColors.squareNormal;
     }
     
-    // Draw square
+    // Draw base square
     canvas.drawRRect(rrect, Paint()..color = bgColor);
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..color = IstoColors.squareBorder
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
+    
+    // Draw valid move highlight with pulsing effect
+    if (isValidMove || isKillTarget) {
+      final pulseValue = 0.5 + 0.5 * sin(_highlightPulsePhase);
+      final highlightColor = isKillTarget 
+          ? GameFeelConfig.killTargetColor 
+          : GameFeelConfig.validMoveColor;
+      final intensity = isKillTarget 
+          ? GameFeelConfig.killTargetIntensity 
+          : 1.0;
+      
+      // Outer glow
+      final glowRadius = GameFeelConfig.validSquareGlowRadius * (0.8 + 0.4 * pulseValue);
+      canvas.drawRRect(
+        rrect.inflate(2),
+        Paint()
+          ..color = highlightColor.withAlpha((GameFeelConfig.validSquareGlowAlpha * pulseValue * intensity).toInt())
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius),
+      );
+      
+      // Inner highlight overlay
+      canvas.drawRRect(
+        rrect,
+        Paint()..color = highlightColor.withAlpha((30 * intensity).toInt()),
+      );
+      
+      // Pulsing border
+      final borderWidth = GameFeelConfig.validSquareBorderWidth * (0.8 + 0.3 * pulseValue);
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = highlightColor.withAlpha((200 * pulseValue * intensity).toInt())
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = borderWidth,
+      );
+    } else {
+      // Normal border
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = IstoColors.squareBorder
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
 
     // Draw X pattern for safe squares and center
     if (isSafe || isCenter) {
@@ -664,10 +806,31 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }
 
   /// Draw a pawn with optional scale and rotation for animations
+  /// Enhanced with game feel effects for selection
   void _drawPawn(Canvas canvas, Offset topLeft, Pawn pawn, double size, bool isHighlighted, [double scale = 1.0, double rotation = 0.0]) {
     final color = IstoColors.getPlayerColor(pawn.playerId);
-    final scaledSize = size * scale;
-    final center = Offset(topLeft.dx + size / 2, topLeft.dy + size / 2);
+    
+    // Apply selection scale enhancement
+    final selectionScale = isHighlighted ? GameFeelConfig.pawnSelectScale : 1.0;
+    final scaledSize = size * scale * selectionScale;
+    
+    // Apply lift effect for highlighted pawns
+    final liftOffset = isHighlighted ? -GameFeelConfig.pawnLiftHeight : 0.0;
+    
+    // Add pulsing bounce for highlighted pawns
+    final pulseOffset = isHighlighted 
+        ? sin(_highlightPulsePhase) * GameFeelConfig.pawnBounceAmplitude 
+        : 0.0;
+    
+    final adjustedTopLeft = Offset(
+      topLeft.dx - (scaledSize - size * scale) / 2,  // Center the enlarged pawn
+      topLeft.dy + liftOffset + pulseOffset - (scaledSize - size * scale) / 2,
+    );
+    
+    final center = Offset(
+      adjustedTopLeft.dx + scaledSize / 2, 
+      adjustedTopLeft.dy + scaledSize / 2,
+    );
     final radius = scaledSize / 2;
     
     canvas.save();
@@ -679,32 +842,41 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       canvas.translate(-center.dx, -center.dy);
     }
     
-    // Highlight glow (pulsing effect)
+    // Enhanced highlight glow with pulsing effect
     if (isHighlighted) {
+      final pulseValue = 0.5 + 0.5 * sin(_highlightPulsePhase);
+      final glowRadius = GameFeelConfig.pawnGlowRadius * (0.8 + 0.4 * pulseValue);
+      final glowAlpha = (GameFeelConfig.pawnGlowAlpha * pulseValue).toInt();
+      
+      // Outer glow (pulsing)
       canvas.drawCircle(
         center,
-        radius + 5,
+        radius + glowRadius,
         Paint()
-          ..color = IstoColors.highlight.withAlpha(180)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          ..color = GameFeelConfig.selectionColor.withAlpha(glowAlpha)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius),
       );
+      
+      // Selection ring
       canvas.drawCircle(
         center,
-        radius + 2,
+        radius + 3,
         Paint()
-          ..color = IstoColors.highlight
+          ..color = GameFeelConfig.selectionColor.withAlpha((200 * pulseValue).toInt())
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
+          ..strokeWidth = 2.5,
       );
     }
 
-    // Shadow
+    // Shadow - more pronounced when lifted
+    final shadowOffset = isHighlighted ? 4.0 : 2.0;
+    final shadowBlur = isHighlighted ? 4.0 : 2.0;
     canvas.drawCircle(
-      center + const Offset(1.5, 2),
+      center + Offset(1.5, shadowOffset),
       radius,
       Paint()
-        ..color = Colors.black.withAlpha(70)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+        ..color = Colors.black.withAlpha(isHighlighted ? 90 : 70)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, shadowBlur),
     );
 
     // Pawn body - gradient effect
@@ -837,15 +1009,45 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     return position.rect;
   }
 
+  /// Highlight valid pawns that can be moved
   void highlightValidPawns(List<Pawn> pawns) {
     _highlightedPawns.clear();
     for (final pawn in pawns) {
       _highlightedPawns.add(pawn.id);
     }
   }
+  
+  /// Highlight valid destination squares for a selected pawn
+  /// [squares] is a list of [row, col] positions
+  /// [killSquares] is a list of squares where a capture would occur
+  void highlightValidSquares(List<List<int>> squares, {List<List<int>>? killSquares}) {
+    _highlightedSquares.clear();
+    _killTargetSquares.clear();
+    
+    for (final sq in squares) {
+      final key = '${sq[0]},${sq[1]}';
+      _highlightedSquares.add(key);
+    }
+    
+    if (killSquares != null) {
+      for (final sq in killSquares) {
+        final key = '${sq[0]},${sq[1]}';
+        _killTargetSquares[key] = true;
+      }
+    }
+  }
 
+  /// Clear all highlights (pawns and squares)
   void clearHighlights() {
     _highlightedPawns.clear();
+    _highlightedSquares.clear();
+    _killTargetSquares.clear();
+  }
+  
+  /// Clear only square highlights (keep pawn highlights)
+  void clearSquareHighlights() {
+    _highlightedSquares.clear();
+    _killTargetSquares.clear();
   }
 
   void updateDisplay() {

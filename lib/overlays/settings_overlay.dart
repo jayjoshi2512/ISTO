@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
+import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
 
-/// Clean, minimal settings overlay
+/// Premium settings overlay with glassmorphism and smooth animations
 class SettingsOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -15,22 +16,31 @@ class SettingsOverlay extends StatefulWidget {
 }
 
 class _SettingsOverlayState extends State<SettingsOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _itemController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _slideAnimation;
 
   bool _soundEnabled = true;
   bool _hapticsEnabled = true;
+  int _gameFeelProfile = GameFeelConfig.currentProfile;
 
   @override
   void initState() {
     super.initState();
     _soundEnabled = feedbackService.soundEnabled;
     _hapticsEnabled = feedbackService.hapticsEnabled;
+    _gameFeelProfile = GameFeelConfig.currentProfile;
 
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _itemController = AnimationController(
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
 
@@ -38,16 +48,28 @@ class _SettingsOverlayState extends State<SettingsOverlay>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    
+    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
 
     _controller.forward();
+    
+    // Stagger items entrance
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        _itemController.forward();
+      }
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _itemController.dispose();
     super.dispose();
   }
 
@@ -69,8 +91,17 @@ class _SettingsOverlayState extends State<SettingsOverlay>
     }
   }
 
+  void _setGameFeelProfile(int profile) {
+    setState(() {
+      _gameFeelProfile = profile;
+      GameFeelConfig.setProfile(profile);
+    });
+    feedbackService.lightTap();
+  }
+
   void _close() {
     feedbackService.lightTap();
+    _itemController.reverse();
     _controller.reverse().then((_) {
       widget.game.overlays.remove('settings');
     });
@@ -89,17 +120,29 @@ class _SettingsOverlayState extends State<SettingsOverlay>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_controller, _itemController]),
       builder: (context, child) {
         return Opacity(
           opacity: _fadeAnimation.value,
           child: Container(
-            color: Colors.black.withAlpha((180 * _fadeAnimation.value).toInt()),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withAlpha((200 * _fadeAnimation.value).toInt()),
+                  DesignSystem.bgDark.withAlpha((220 * _fadeAnimation.value).toInt()),
+                ],
+              ),
+            ),
             child: SafeArea(
               child: Center(
-                child: Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: child,
+                child: Transform.translate(
+                  offset: Offset(0, _slideAnimation.value),
+                  child: Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: child,
+                  ),
                 ),
               ),
             ),
@@ -107,9 +150,35 @@ class _SettingsOverlayState extends State<SettingsOverlay>
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: DesignSystem.cardDecoration,
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        constraints: const BoxConstraints(maxWidth: 340),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              DesignSystem.surfaceLight.withAlpha(250),
+              DesignSystem.surface.withAlpha(250),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(DesignSystem.radiusXL),
+          border: Border.all(
+            color: Colors.white.withAlpha(15),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(100),
+              blurRadius: 32,
+              offset: const Offset(0, 12),
+            ),
+            BoxShadow(
+              color: DesignSystem.accent.withAlpha(20),
+              blurRadius: 40,
+              spreadRadius: -10,
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -138,6 +207,11 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                     value: _hapticsEnabled,
                     onToggle: _toggleHaptics,
                   ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Game Feel Profile Selector
+                  _buildGameFeelSelector(),
                   
                   const SizedBox(height: 20),
                   
@@ -267,6 +341,104 @@ class _SettingsOverlayState extends State<SettingsOverlay>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildGameFeelSelector() {
+    final profiles = ['Minimal', 'Moderate', 'Rich'];
+    final descriptions = [
+      'Clean, focused',
+      'Balanced juice',
+      'Full experience',
+    ];
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: DesignSystem.surface,
+        borderRadius: BorderRadius.circular(DesignSystem.radiusM),
+        border: Border.all(color: DesignSystem.border.withAlpha(100)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                color: DesignSystem.accent,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Game Feel',
+                      style: DesignSystem.bodyMedium.copyWith(
+                        color: DesignSystem.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      descriptions[_gameFeelProfile],
+                      style: DesignSystem.caption.copyWith(
+                        color: DesignSystem.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Profile chips
+          Row(
+            children: List.generate(3, (index) {
+              final isSelected = _gameFeelProfile == index;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _setGameFeelProfile(index),
+                  child: AnimatedContainer(
+                    duration: DesignSystem.animFast,
+                    margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? DesignSystem.accent.withAlpha(30) 
+                          : DesignSystem.bgLight,
+                      borderRadius: BorderRadius.circular(DesignSystem.radiusS),
+                      border: Border.all(
+                        color: isSelected 
+                            ? DesignSystem.accent 
+                            : DesignSystem.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      profiles[index],
+                      textAlign: TextAlign.center,
+                      style: DesignSystem.caption.copyWith(
+                        color: isSelected 
+                            ? DesignSystem.accent 
+                            : DesignSystem.textSecondary,
+                        fontWeight: isSelected 
+                            ? FontWeight.w600 
+                            : FontWeight.normal,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

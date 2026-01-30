@@ -5,3 +5,4 @@ export 'animation_config.dart';
 export 'player_colors.dart';
 export 'layout_config.dart';
 export 'design_system.dart';
+export 'game_feel_config.dart';

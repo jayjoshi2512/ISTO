@@ -3,10 +3,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
+import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
 
-/// Clean, celebratory win overlay with confetti and staggered animations
+/// Premium celebratory win overlay with enhanced confetti, fireworks, and animations
 class WinOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -20,13 +21,18 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _confettiController;
   late AnimationController _glowController;
+  late AnimationController _starBurstController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _trophyAnimation;
   late Animation<double> _glowAnimation;
+  late Animation<double> _starBurstAnimation;
 
   // Confetti particles
   late List<_ConfettiParticle> _particles;
+  
+  // Star burst particles for extra celebration
+  late List<_StarBurstParticle> _starBursts;
 
   @override
   void initState() {
@@ -34,7 +40,7 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
 
     // Main entrance animation
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
@@ -45,10 +51,10 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.1, 0.5, curve: Curves.elasticOut),
+        curve: const Interval(0.1, 0.6, curve: Curves.elasticOut),
       ),
     );
 
@@ -61,46 +67,81 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
 
     // Confetti animation
     _confettiController = AnimationController(
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 4000),
       vsync: this,
     );
 
     // Pulsing glow animation
     _glowController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
-    _glowAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _glowAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+    
+    // Star burst animation
+    _starBurstController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    
+    _starBurstAnimation = CurvedAnimation(
+      parent: _starBurstController,
+      curve: Curves.easeOut,
+    );
 
-    // Initialize confetti particles
-    final random = Random();
-    _particles = List.generate(30, (index) {
-      return _ConfettiParticle(
-        x: random.nextDouble(),
-        y: -0.1 - random.nextDouble() * 0.3,
-        size: 6 + random.nextDouble() * 8,
-        color:
-            [
-              DesignSystem.accentGold,
-              Colors.amber,
-              Colors.orange,
-              Colors.yellow,
-              Colors.white,
-            ][random.nextInt(5)],
-        speed: 0.3 + random.nextDouble() * 0.4,
-        rotation: random.nextDouble() * 360,
-        rotationSpeed: (random.nextDouble() - 0.5) * 10,
-        wobble: random.nextDouble() * 50,
-      );
-    });
+    // Initialize particles
+    _initParticles();
 
     _controller.forward();
     _confettiController.repeat();
     _glowController.repeat(reverse: true);
+    
+    // Delayed star burst
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _starBurstController.forward();
+    });
+    
     feedbackService.onWin();
+  }
+  
+  void _initParticles() {
+    final random = Random();
+    final confettiCount = GameFeelConfig.winConfettiCount;
+    
+    _particles = List.generate(confettiCount, (index) {
+      return _ConfettiParticle(
+        x: random.nextDouble(),
+        y: -0.1 - random.nextDouble() * 0.4,
+        size: 6 + random.nextDouble() * 10,
+        color: [
+          DesignSystem.accentGold,
+          Colors.amber,
+          Colors.orange,
+          Colors.yellow,
+          Colors.white,
+          DesignSystem.accent,
+        ][random.nextInt(6)],
+        speed: 0.25 + random.nextDouble() * 0.35,
+        rotation: random.nextDouble() * 360,
+        rotationSpeed: (random.nextDouble() - 0.5) * 12,
+        wobble: random.nextDouble() * 60,
+        shape: random.nextInt(3), // 0: rectangle, 1: circle, 2: star
+      );
+    });
+    
+    // Star bursts from center
+    _starBursts = List.generate(12, (index) {
+      final angle = (index / 12) * 2 * pi;
+      return _StarBurstParticle(
+        angle: angle,
+        distance: 80 + random.nextDouble() * 40,
+        size: 4 + random.nextDouble() * 4,
+        color: DesignSystem.accentGold.withAlpha(200),
+      );
+    });
   }
 
   @override
@@ -108,6 +149,7 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
     _controller.dispose();
     _confettiController.dispose();
     _glowController.dispose();
+    _starBurstController.dispose();
     super.dispose();
   }
 
@@ -121,22 +163,25 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
         _controller,
         _confettiController,
         _glowController,
+        _starBurstController,
       ]),
       builder: (context, child) {
         return Stack(
           children: [
-            // Background and main content
+            // Background with radial glow
             Opacity(
               opacity: _fadeAnimation.value,
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 1.2,
                     colors: [
-                      Colors.black.withAlpha(230),
-                      DesignSystem.bgDark.withAlpha(250),
+                      winner.color.withAlpha((40 * _glowAnimation.value).toInt()),
+                      Colors.black.withAlpha(240),
+                      DesignSystem.bgDark,
                     ],
+                    stops: const [0.0, 0.5, 1.0],
                   ),
                 ),
                 child: SafeArea(
@@ -149,6 +194,10 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
                 ),
               ),
             ),
+            
+            // Star burst layer
+            if (_starBurstAnimation.value > 0)
+              ..._buildStarBursts(context, winner.color),
 
             // Confetti layer
             if (_fadeAnimation.value > 0.5) ..._buildConfetti(context),
@@ -158,6 +207,42 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
       child: _buildContent(winner),
     );
   }
+  
+  List<Widget> _buildStarBursts(BuildContext context, Color winnerColor) {
+    final size = MediaQuery.of(context).size;
+    final centerX = size.width / 2;
+    final centerY = size.height / 2 - 50; // Offset up towards trophy
+    final progress = _starBurstAnimation.value;
+    
+    return _starBursts.map((star) {
+      final distance = star.distance * progress;
+      final x = centerX + cos(star.angle) * distance;
+      final y = centerY + sin(star.angle) * distance;
+      final opacity = (1.0 - progress).clamp(0.0, 1.0);
+      
+      return Positioned(
+        left: x - star.size / 2,
+        top: y - star.size / 2,
+        child: Opacity(
+          opacity: opacity,
+          child: Container(
+            width: star.size,
+            height: star.size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: winnerColor,
+              boxShadow: [
+                BoxShadow(
+                  color: winnerColor.withAlpha(150),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
 
   List<Widget> _buildConfetti(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -165,33 +250,70 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
 
     return _particles.map((particle) {
       final y = particle.y + progress * particle.speed * 1.5;
-      if (y > 1.1) return const SizedBox.shrink();
+      if (y > 1.2) return const SizedBox.shrink();
 
-      final x = particle.x + sin(progress * 3 + particle.wobble) * 0.05;
+      final x = particle.x + sin(progress * 3 + particle.wobble) * 0.06;
       final rotation =
           particle.rotation + progress * particle.rotationSpeed * 360;
+      final fadeOut = y > 0.9 ? (1.2 - y) / 0.3 : 1.0;
 
       return Positioned(
         left: x * size.width - particle.size / 2,
         top: y * size.height,
         child: Transform.rotate(
           angle: rotation * 3.14159 / 180,
+          child: Opacity(
+            opacity: (fadeOut * 0.9).clamp(0.0, 1.0),
+            child: _buildConfettiShape(particle),
+          ),
+        ),
+      );
+    }).toList();
+  }
+  
+  Widget _buildConfettiShape(_ConfettiParticle particle) {
+    switch (particle.shape) {
+      case 0: // Rectangle
+        return Container(
+          width: particle.size,
+          height: particle.size * 0.5,
+          decoration: BoxDecoration(
+            color: particle.color,
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
+            ],
+          ),
+        );
+      case 1: // Circle
+        return Container(
+          width: particle.size * 0.7,
+          height: particle.size * 0.7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: particle.color,
+            boxShadow: [
+              BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
+            ],
+          ),
+        );
+      case 2: // Star shape (diamond)
+      default:
+        return Transform.rotate(
+          angle: pi / 4,
           child: Container(
-            width: particle.size,
+            width: particle.size * 0.6,
             height: particle.size * 0.6,
             decoration: BoxDecoration(
-              color: particle.color.withAlpha(
-                (255 * (1 - progress * 0.3)).toInt(),
-              ),
+              color: particle.color,
               borderRadius: BorderRadius.circular(2),
               boxShadow: [
                 BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
               ],
             ),
           ),
-        ),
-      );
-    }).toList();
+        );
+    }
   }
 
   Widget _buildContent(dynamic winner) {
@@ -445,6 +567,7 @@ class _ConfettiParticle {
   final double rotation;
   final double rotationSpeed;
   final double wobble;
+  final int shape;
 
   _ConfettiParticle({
     required this.x,
@@ -455,5 +578,21 @@ class _ConfettiParticle {
     required this.rotation,
     required this.rotationSpeed,
     required this.wobble,
+    required this.shape,
+  });
+}
+
+/// Star burst particle for celebration effect
+class _StarBurstParticle {
+  final double angle;
+  final double distance;
+  final double size;
+  final Color color;
+
+  _StarBurstParticle({
+    required this.angle,
+    required this.distance,
+    required this.size,
+    required this.color,
   });
 }
