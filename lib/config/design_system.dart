@@ -1,206 +1,233 @@
 import 'package:flutter/material.dart';
 
-/// Unified design system for ISTO game
-/// Clean, polished, minimal, elegant design language
+/// Premium design system for ISTO — Chowka Bhara
+/// 
+/// Deep royal Indian aesthetic — sandalwood, burgundy, antique gold, 
+/// with rich jewel-toned player colors on a dark mahogany canvas.
 class DesignSystem {
-  // === COLORS ===
-  
-  /// Primary background gradient
-  static const Color bgDark = Color(0xFF0D0A14);
-  static const Color bgMedium = Color(0xFF1A1525);
-  static const Color bgLight = Color(0xFF251E35);
-  
-  /// Accent colors
-  static const Color accent = Color(0xFF4ECCA3);  // Teal - primary actions
-  static const Color accentGold = Color(0xFFD4AF37);  // Gold - highlights
-  static const Color accentPurple = Color(0xFF8B5CF6);  // Purple - decorative
-  
-  /// Text colors
-  static const Color textPrimary = Color(0xFFF5F5F5);
-  static const Color textSecondary = Color(0xFFB8B8B8);
-  static const Color textMuted = Color(0xFF6B6B6B);
-  
-  /// Surface colors
-  static const Color surface = Color(0xFF1E1830);
-  static const Color surfaceLight = Color(0xFF2A2340);
-  static const Color border = Color(0xFF3D3555);
-  static const Color borderLight = Color(0xFF524A6A);
-  
-  // === GRADIENTS ===
-  
+  // ========== CORE COLORS ==========
+  static const Color bgDark = Color(0xFF100B08);       // Deep charcoal-wood
+  static const Color bgMedium = Color(0xFF1C140D);     // Dark mahogany
+  static const Color bgLight = Color(0xFF2E2015);      // Warm umber
+  static const Color surface = Color(0xFF211810);       // Burnt sienna base
+  static const Color surfaceLight = Color(0xFF3A2A1C);  // Lighter wood  
+  static const Color surfaceGlass = Color(0x18FFFFFF);  // Frosted glass
+
+  static const Color accent = Color(0xFFF2C94C);       // Warm antique gold
+  static const Color accentLight = Color(0xFFF7DC6F);   // Pale gold
+  static const Color accentDark = Color(0xFFAA8A2E);    // Deep brass
+
+  static const Color textPrimary = Color(0xFFF0E6D2);   // Parchment white
+  static const Color textSecondary = Color(0xFFC4AE92); // Warm sand
+  static const Color textMuted = Color(0xFF786858);     // Muted clay
+
+  static const Color success = Color(0xFF2ECC71);       // Emerald green
+  static const Color danger = Color(0xFFE74C3C);        // Rich vermillion
+  static const Color warning = Color(0xFFF39C12);       // Turmeric amber
+
+  // ========== GRADIENTS ==========
   static const LinearGradient bgGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [bgDark, bgMedium, bgLight],
-    stops: [0.0, 0.5, 1.0],
+    colors: [Color(0xFF1C140D), Color(0xFF100B08), Color(0xFF0A0705)],
   );
-  
-  static const LinearGradient cardGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [surfaceLight, surface],
-  );
-  
-  static const LinearGradient accentGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF5CDBB3), accent],
-  );
-  
+
   static const LinearGradient goldGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE5C158), accentGold, Color(0xFFB8942F)],
+    colors: [Color(0xFFF7DC6F), Color(0xFFF2C94C), Color(0xFFAA8A2E)],
   );
-  
-  // === TYPOGRAPHY ===
-  
-  static const TextStyle headingLarge = TextStyle(
-    color: textPrimary,
+
+  static const LinearGradient surfaceGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF3A2A1C), Color(0xFF211810)],
+  );
+
+  static const RadialGradient goldRadialGlow = RadialGradient(
+    center: Alignment.center,
+    radius: 0.8,
+    colors: [Color(0x40F2C94C), Color(0x00F2C94C)],
+  );
+
+  // ========== TYPOGRAPHY ==========
+  static const TextStyle displayLarge = TextStyle(
+    fontFamily: 'Inter',
     fontSize: 48,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w900,
+    color: textPrimary,
     letterSpacing: 4,
+    height: 1.1,
   );
-  
+
+  static const TextStyle headingLarge = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 28,
+    fontWeight: FontWeight.w800,
+    color: textPrimary,
+    letterSpacing: 1.5,
+  );
+
   static const TextStyle headingMedium = TextStyle(
-    color: textPrimary,
-    fontSize: 24,
+    fontFamily: 'Inter',
+    fontSize: 22,
     fontWeight: FontWeight.w700,
-    letterSpacing: 2,
+    color: textPrimary,
+    letterSpacing: 0.8,
   );
-  
+
   static const TextStyle headingSmall = TextStyle(
-    color: textPrimary,
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontSize: 18,
     fontWeight: FontWeight.w600,
-    letterSpacing: 1,
+    color: textPrimary,
   );
-  
+
   static const TextStyle bodyLarge = TextStyle(
-    color: textSecondary,
+    fontFamily: 'Inter',
     fontSize: 16,
-    fontWeight: FontWeight.w400,
-  );
-  
-  static const TextStyle bodyMedium = TextStyle(
-    color: textSecondary,
-    fontSize: 14,
-    fontWeight: FontWeight.w400,
-  );
-  
-  static const TextStyle caption = TextStyle(
-    color: textMuted,
-    fontSize: 12,
     fontWeight: FontWeight.w500,
-    letterSpacing: 1.5,
-  );
-  
-  static const TextStyle button = TextStyle(
     color: textPrimary,
+  );
+
+  static const TextStyle bodyMedium = TextStyle(
+    fontFamily: 'Inter',
     fontSize: 14,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.5,
+    fontWeight: FontWeight.w400,
+    color: textSecondary,
   );
-  
-  // === SPACING ===
-  
-  static const double spacingXS = 4;
-  static const double spacingS = 8;
-  static const double spacingM = 16;
-  static const double spacingL = 24;
-  static const double spacingXL = 32;
-  static const double spacingXXL = 48;
-  
-  // === BORDER RADIUS ===
-  
-  static const double radiusS = 8;
-  static const double radiusM = 12;
-  static const double radiusL = 16;
-  static const double radiusXL = 24;
-  static const double radiusFull = 999;
-  
-  // === SHADOWS ===
-  
-  static List<BoxShadow> shadowSmall = [
-    BoxShadow(
-      color: Colors.black.withAlpha(40),
-      blurRadius: 8,
-      offset: const Offset(0, 2),
-    ),
-  ];
-  
-  static List<BoxShadow> shadowMedium = [
-    BoxShadow(
-      color: Colors.black.withAlpha(60),
-      blurRadius: 16,
-      offset: const Offset(0, 4),
-    ),
-  ];
-  
-  static List<BoxShadow> shadowLarge = [
-    BoxShadow(
-      color: Colors.black.withAlpha(80),
-      blurRadius: 24,
-      offset: const Offset(0, 8),
-    ),
-  ];
-  
-  static List<BoxShadow> glowAccent = [
-    BoxShadow(
-      color: accent.withAlpha(60),
-      blurRadius: 16,
-      spreadRadius: 2,
-    ),
-  ];
-  
-  static List<BoxShadow> glowGold = [
-    BoxShadow(
-      color: accentGold.withAlpha(60),
-      blurRadius: 16,
-      spreadRadius: 2,
-    ),
-  ];
-  
-  // === DECORATIONS ===
-  
-  static BoxDecoration cardDecoration = BoxDecoration(
-    gradient: cardGradient,
-    borderRadius: BorderRadius.circular(radiusL),
-    border: Border.all(color: border, width: 1),
-    boxShadow: shadowMedium,
+
+  static const TextStyle bodySmall = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: textMuted,
   );
-  
-  static BoxDecoration accentButtonDecoration = BoxDecoration(
-    gradient: accentGradient,
-    borderRadius: BorderRadius.circular(radiusFull),
-    boxShadow: glowAccent,
+
+  static const TextStyle caption = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    color: textMuted,
+    letterSpacing: 0.5,
   );
-  
-  static BoxDecoration outlineButtonDecoration = BoxDecoration(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(radiusFull),
-    border: Border.all(color: border, width: 1.5),
+
+  static const TextStyle buttonText = TextStyle(
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1A0E04),
+    letterSpacing: 1.2,
   );
-  
-  // === ANIMATIONS ===
-  
-  static const Duration animFast = Duration(milliseconds: 150);
-  static const Duration animNormal = Duration(milliseconds: 250);
-  static const Duration animSlow = Duration(milliseconds: 400);
-  static const Curve animCurve = Curves.easeOutCubic;
+
+  // ========== SPACING ==========
+  static const double spacingXs = 4;
+  static const double spacingSm = 8;
+  static const double spacingMd = 16;
+  static const double spacingLg = 24;
+  static const double spacingXl = 32;
+  static const double spacingXxl = 48;
+
+  // ========== BORDER RADIUS ==========
+  static const double radiusSm = 8;
+  static const double radiusMd = 12;
+  static const double radiusLg = 16;
+  static const double radiusXl = 24;
+  static const double radiusFull = 100;
+
+  // ========== SHADOWS ==========
+  static List<BoxShadow> get softShadow => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ];
+
+  static List<BoxShadow> get glowShadow => [
+        BoxShadow(
+          color: accent.withValues(alpha: 0.3),
+          blurRadius: 20,
+          spreadRadius: 2,
+        ),
+      ];
+
+  static List<BoxShadow> playerGlow(Color color) => [
+        BoxShadow(
+          color: color.withValues(alpha: 0.4),
+          blurRadius: 16,
+          spreadRadius: 2,
+        ),
+      ];
+
+  // ========== DECORATIONS ==========
+  static BoxDecoration get glassSurface => BoxDecoration(
+        color: surfaceGlass,
+        borderRadius: BorderRadius.circular(radiusMd),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1,
+        ),
+      );
+
+  static BoxDecoration get glassCard => BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.03),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(radiusLg),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      );
+
+  static BoxDecoration goldButton({bool pressed = false}) => BoxDecoration(
+        gradient: pressed
+            ? const LinearGradient(
+                colors: [Color(0xFFB8860B), Color(0xFFDAA520)],
+              )
+            : goldGradient,
+        borderRadius: BorderRadius.circular(radiusFull),
+        boxShadow: pressed
+            ? []
+            : [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      );
 }
 
-/// Reusable premium button widget
+/// Premium button widget used across the app
 class PremiumButton extends StatefulWidget {
-  final String text;
+  final String label;
   final VoidCallback onTap;
   final bool isPrimary;
   final IconData? icon;
   final double? width;
-  
+
   const PremiumButton({
     super.key,
-    required this.text,
+    required this.label,
     required this.onTap,
     this.isPrimary = true,
     this.icon,
@@ -211,30 +238,62 @@ class PremiumButton extends StatefulWidget {
   State<PremiumButton> createState() => _PremiumButtonState();
 }
 
-class _PremiumButtonState extends State<PremiumButton> {
-  bool _isPressed = false;
+class _PremiumButtonState extends State<PremiumButton>
+    with SingleTickerProviderStateMixin {
+  bool _pressed = false;
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.04).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onTap();
+    return GameAnimatedBuilder(
+      animation: _pulseAnim,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: widget.isPrimary && !_pressed ? _pulseAnim.value : 1.0,
+          child: child,
+        );
       },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: DesignSystem.animFast,
-        child: Container(
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
           width: widget.width,
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.icon != null ? 20 : 32,
-            vertical: 14,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           decoration: widget.isPrimary
-              ? DesignSystem.accentButtonDecoration
-              : DesignSystem.outlineButtonDecoration,
+              ? DesignSystem.goldButton(pressed: _pressed)
+              : BoxDecoration(
+                  color: _pressed
+                      ? DesignSystem.surfaceLight
+                      : DesignSystem.surface,
+                  borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+                  border: Border.all(
+                    color: DesignSystem.textMuted.withValues(alpha: 0.3),
+                  ),
+                ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -242,20 +301,21 @@ class _PremiumButtonState extends State<PremiumButton> {
               if (widget.icon != null) ...[
                 Icon(
                   widget.icon,
-                  color: widget.isPrimary 
-                      ? DesignSystem.textPrimary 
-                      : DesignSystem.textSecondary,
-                  size: 18,
+                  size: 20,
+                  color: widget.isPrimary
+                      ? const Color(0xFF1A0E04)
+                      : DesignSystem.textPrimary,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
               ],
               Text(
-                widget.text,
-                style: DesignSystem.button.copyWith(
-                  color: widget.isPrimary 
-                      ? DesignSystem.textPrimary 
-                      : DesignSystem.textSecondary,
-                ),
+                widget.label,
+                style: widget.isPrimary
+                    ? DesignSystem.buttonText
+                    : DesignSystem.bodyLarge.copyWith(
+                        color: DesignSystem.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
               ),
             ],
           ),
@@ -265,27 +325,95 @@ class _PremiumButtonState extends State<PremiumButton> {
   }
 }
 
-/// Minimal divider
-class MinimalDivider extends StatelessWidget {
-  final double? width;
-  
-  const MinimalDivider({super.key, this.width});
+/// A simple animated builder helper
+class GameAnimatedBuilder extends StatelessWidget {
+  final Animation<double> animation;
+  final Widget Function(BuildContext, Widget?) builder;
+  final Widget? child;
+
+  const GameAnimatedBuilder({
+    super.key,
+    required this.animation,
+    required this.builder,
+    this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width ?? 60,
-      height: 2,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.transparent,
-            DesignSystem.borderLight,
-            Colors.transparent,
-          ],
+    return _GameAnimatedBuilderInner(
+      listenable: animation,
+      builder: builder,
+      child: child,
+    );
+  }
+}
+
+class _GameAnimatedBuilderInner extends AnimatedWidget {
+  final Widget Function(BuildContext, Widget?) builder;
+  final Widget? child;
+
+  const _GameAnimatedBuilderInner({
+    required super.listenable,
+    required this.builder,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return builder(context, child);
+  }
+}
+
+/// Minimal divider with gold center accent
+class MinimalDivider extends StatelessWidget {
+  const MinimalDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  DesignSystem.textMuted.withValues(alpha: 0.3),
+                ],
+              ),
+            ),
+          ),
         ),
-        borderRadius: BorderRadius.circular(1),
-      ),
+        Container(
+          width: 6,
+          height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: DesignSystem.accent,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: DesignSystem.accent.withValues(alpha: 0.5),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  DesignSystem.textMuted.withValues(alpha: 0.3),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

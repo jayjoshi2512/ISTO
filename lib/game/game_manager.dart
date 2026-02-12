@@ -1,11 +1,15 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
 import '../config/theme_config.dart';
 import '../models/models.dart';
 import '../controllers/controllers.dart';
 import '../services/feedback_service.dart';
 
-/// Main game orchestrator - coordinates all controllers
-/// 
-/// ISTO/Chowka Bhara Rules:
+/// Main game orchestrator — coordinates all controllers
+///
+/// ISTO / Chowka Bhara Rules:
 /// - Entry: 1, 4, or 8 releases a pawn from home
 /// - Extra turns on CHOWKA (4), ASHTA (8), or capture
 /// - Must capture at least one opponent before entering inner ring
@@ -16,12 +20,24 @@ class GameManager {
   late final PawnController pawnController;
   late final CowryController cowryController;
   late final TurnStateMachine turnStateMachine;
+  AIController? aiController;
 
   final List<Player> players = [];
   int playerCount;
-  
+  GameConfig gameConfig;
+
   /// Track captures per player (needed for inner ring entry rule)
   final Map<int, int> captureCount = {};
+
+  /// Prevent duplicate AI scheduling
+  Timer? _aiRollTimer;
+  Timer? _aiMoveTimer;
+  Timer? _aiWatchdogTimer;
+
+  /// Whether cowry animation is in progress — highlights deferred until done
+  bool _cowryAnimating = false;
+  List<Pawn>? _pendingHighlights;
+  CowryRoll? _pendingHighlightRoll;
 
   // Callbacks for UI updates
   Function()? onStateChanged;
@@ -32,8 +48,16 @@ class GameManager {
   Function(List<Pawn> validPawns)? onValidMovesCalculated;
   Function()? onExtraTurn;
   Function()? onNoValidMoves;
+  Function(Pawn pawn, int stackedCount)? onStackedPawnChoice;
 
-  GameManager({this.playerCount = 2}) {
+  /// Called when it's AI's turn and AI needs to roll
+  Function()? onAIRoll;
+
+  /// Called when AI selects a pawn to move
+  Function(Pawn pawn)? onAIMove;
+
+  GameManager({this.playerCount = 2, GameConfig? config})
+      : gameConfig = config ?? GameConfig.local(2) {
     _initControllers();
   }
 
@@ -43,29 +67,53 @@ class GameManager {
     cowryController = CowryController();
     turnStateMachine = TurnStateMachine(playerCount: playerCount);
   }
-  
-  /// Check if player has made at least one capture (for inner ring entry)
+
+  /// Check if player has made at least one capture
   bool hasPlayerCaptured(int playerId) {
     return (captureCount[playerId] ?? 0) > 0;
   }
 
+  /// Check if current player is AI
+  bool get isCurrentPlayerAI =>
+      gameConfig.isAIPlayer(turnStateMachine.currentPlayerId);
+
   /// Start a new game
-  void startGame({int players = 2}) {
-    playerCount = players.clamp(2, 4);
+  void startGame({int players = 2, GameConfig? config}) {
+    // Cancel any pending AI timers
+    _cancelAITimers();
+
+    if (config != null) {
+      gameConfig = config;
+      playerCount = config.playerCount;
+    } else {
+      playerCount = players.clamp(2, 4);
+      gameConfig = GameConfig.local(playerCount);
+    }
+
+    // Setup AI if needed
+    if (gameConfig.hasAIPlayers) {
+      aiController = AIController(difficulty: gameConfig.aiDifficulty);
+    } else {
+      aiController = null;
+    }
 
     // Reset controllers
     boardController.reset();
     turnStateMachine.reset(playerCount);
-    
-    // Reset capture counts
     captureCount.clear();
+    _cowryAnimating = false;
+    _pendingHighlights = null;
+    _pendingHighlightRoll = null;
 
     // Initialize players
     this.players.clear();
     for (int i = 0; i < playerCount; i++) {
+      final isAI = gameConfig.isAIPlayer(i);
       this.players.add(Player(
         id: i,
-        name: ThemeConfig.getPlayerName(i),
+        name: isAI
+            ? '${ThemeConfig.getPlayerName(i)} (AI)'
+            : ThemeConfig.getPlayerName(i),
         color: ThemeConfig.getPlayerColor(i),
       ));
       captureCount[i] = 0;
@@ -78,114 +126,242 @@ class GameManager {
     turnStateMachine.startTurn();
     feedbackService.onTurnStart();
     onStateChanged?.call();
+
+    // If first player is AI, trigger AI turn
+    if (isCurrentPlayerAI) {
+      scheduleAIRoll();
+    }
   }
 
-  /// Get current player
   Player get currentPlayer => players[turnStateMachine.currentPlayerId];
-
-  /// Get current phase
   TurnPhase get currentPhase => turnStateMachine.phase;
-
-  /// Check if game is over
   bool get isGameOver => turnStateMachine.isGameOver;
 
-  /// Get winner
   Player? get winner {
     final winnerId = turnStateMachine.winnerId;
     return winnerId != null ? players[winnerId] : null;
   }
 
+  /// Called by UI when cowry roll animation finishes
+  void onCowryAnimationComplete() {
+    _cowryAnimating = false;
+    // Now show the deferred highlights
+    if (_pendingHighlights != null && _pendingHighlights!.isNotEmpty) {
+      onValidMovesCalculated?.call(_pendingHighlights!);
+      // If AI, schedule move now
+      if (isCurrentPlayerAI && aiController != null && _pendingHighlightRoll != null) {
+        _scheduleAIMove(_pendingHighlights!, _pendingHighlightRoll!);
+      }
+    }
+    _pendingHighlights = null;
+    _pendingHighlightRoll = null;
+  }
+
   /// Roll the cowries
   CowryRoll roll() {
-    if (currentPhase != TurnPhase.waitingForRoll) {
-      throw StateError('Cannot roll in phase: $currentPhase');
+    if (currentPhase != TurnPhase.waitingForRoll || _cowryAnimating) {
+      debugPrint('GameManager: Cannot roll in phase $currentPhase (animating=$_cowryAnimating)');
+      return cowryController.lastRoll ?? CowryRoll.withUpCount(1);
     }
 
     final roll = cowryController.roll();
-    
-    // Haptic feedback for roll
+
     if (roll.grantsExtraTurn) {
       feedbackService.onGraceThrow();
     } else {
       feedbackService.onRoll();
     }
-    
+
+    // Mark cowry animation as in progress
+    _cowryAnimating = true;
+
     turnStateMachine.onRollComplete(roll);
 
-    // Calculate valid moves (pass capture status for inner ring check)
+    // Fire roll complete FIRST so UI starts animating cowries
+    onRollComplete?.call(roll);
+
+    // Calculate valid moves
     final validPawns = _getValidPawns(roll);
 
     if (validPawns.isEmpty) {
-      // No valid moves - end turn
       feedbackService.onNoMoves();
-      onNoValidMoves?.call();
-      turnStateMachine.onNoValidMoves();
-      _checkGameState();
+      // Defer no-moves notification until after animation
+      _pendingHighlights = [];
+      _pendingHighlightRoll = roll;
+      Timer(const Duration(milliseconds: 900), () {
+        onNoValidMoves?.call();
+        turnStateMachine.onNoValidMoves();
+        _checkGameState();
+      });
     } else {
-      onValidMovesCalculated?.call(validPawns);
+      // Defer highlights until cowry animation completes
+      _pendingHighlights = validPawns;
+      _pendingHighlightRoll = roll;
     }
 
-    onRollComplete?.call(roll);
     onStateChanged?.call();
 
     return roll;
   }
 
-  /// Get pawns that can make a valid move with current roll
+  /// Cancel all pending AI timers
+  void _cancelAITimers() {
+    _aiRollTimer?.cancel();
+    _aiRollTimer = null;
+    _aiMoveTimer?.cancel();
+    _aiMoveTimer = null;
+    _aiWatchdogTimer?.cancel();
+    _aiWatchdogTimer = null;
+  }
+
+  void scheduleAIRoll() {
+    if (aiController == null || isGameOver) return;
+
+    // Cancel any existing AI roll timer to prevent duplicates
+    _aiRollTimer?.cancel();
+
+    final delay = aiController!.getRollDelay();
+    _aiRollTimer = Timer(Duration(milliseconds: delay), () {
+      _aiRollTimer = null;
+      if (currentPhase == TurnPhase.waitingForRoll &&
+          isCurrentPlayerAI &&
+          !isGameOver) {
+        onAIRoll?.call();
+      } else if (isCurrentPlayerAI && !isGameOver) {
+        // Phase mismatch — retry after short delay (watchdog)
+        _startAIWatchdog();
+      }
+    });
+  }
+
+  /// Watchdog timer that retries AI scheduling if something gets stuck
+  void _startAIWatchdog() {
+    _aiWatchdogTimer?.cancel();
+    _aiWatchdogTimer = Timer(const Duration(milliseconds: 2000), () {
+      _aiWatchdogTimer = null;
+      if (isGameOver) return;
+
+      if (isCurrentPlayerAI) {
+        if (currentPhase == TurnPhase.waitingForRoll) {
+          debugPrint('AI Watchdog: Retrying AI roll');
+          onAIRoll?.call();
+        } else if (currentPhase == TurnPhase.selectingPawn) {
+          // AI was supposed to select a pawn but didn't
+          debugPrint('AI Watchdog: AI stuck in selectingPawn, forcing roll recalc');
+          final roll = cowryController.lastRoll;
+          if (roll != null) {
+            final validPawns = _getValidPawns(roll);
+            if (validPawns.isNotEmpty) {
+              _executeAIMove(validPawns, roll);
+            } else {
+              turnStateMachine.onNoValidMoves();
+              _checkGameState();
+            }
+          }
+        } else if (currentPhase == TurnPhase.checkingExtraTurn) {
+          debugPrint('AI Watchdog: Stuck in checkingExtraTurn, forcing advance');
+          _checkGameState();
+        }
+      }
+    });
+  }
+
+  void _scheduleAIMove(List<Pawn> validPawns, CowryRoll roll) {
+    if (aiController == null || isGameOver) return;
+
+    // Cancel existing to prevent duplicates
+    _aiMoveTimer?.cancel();
+
+    final delay = aiController!.getMoveDelay();
+    _aiMoveTimer = Timer(Duration(milliseconds: delay), () {
+      _aiMoveTimer = null;
+      if (currentPhase == TurnPhase.selectingPawn &&
+          isCurrentPlayerAI &&
+          !isGameOver) {
+        _executeAIMove(validPawns, roll);
+      } else if (isCurrentPlayerAI && !isGameOver) {
+        // Phase mismatch — start watchdog
+        _startAIWatchdog();
+      }
+    });
+  }
+
+  void _executeAIMove(List<Pawn> validPawns, CowryRoll roll) {
+    if (validPawns.isEmpty) return;
+
+    // Re-validate valid pawns in case board state changed
+    final freshValidPawns = _getValidPawns(roll);
+    if (freshValidPawns.isEmpty) {
+      turnStateMachine.onNoValidMoves();
+      _checkGameState();
+      return;
+    }
+
+    final playerId = turnStateMachine.currentPlayerId;
+    final hasCaptured = hasPlayerCaptured(playerId);
+
+    final selectedPawn = aiController!.selectPawn(
+      freshValidPawns,
+      roll.steps,
+      roll,
+      boardController,
+      pawnController.pawns,
+      playerId,
+      hasCaptured,
+    );
+
+    onAIMove?.call(selectedPawn);
+
+    final stacked = getStackedPawns(selectedPawn);
+    if (stacked.length > 1 && isPawnOnInnerPath(selectedPawn)) {
+      final count = aiController!.selectStackedPawnCount(
+        stacked,
+        roll.steps,
+        boardController,
+        pawnController.pawns,
+        playerId,
+      );
+      selectPawn(selectedPawn, movePawnCount: count);
+    } else {
+      selectPawn(selectedPawn);
+    }
+  }
+
   List<Pawn> _getValidPawns(CowryRoll roll) {
     final playerId = turnStateMachine.currentPlayerId;
     final hasCaptured = hasPlayerCaptured(playerId);
-    
     return boardController.getValidMoves(
       playerId,
       roll.steps,
       pawnController.pawns,
       roll.allowsEntry,
-      hasCaptured, // Pass capture status for inner ring restriction
+      hasCaptured,
     );
   }
 
-  /// Get current valid pawns (based on last roll)
   List<Pawn> get validPawns {
     final roll = cowryController.lastRoll;
     if (roll == null) return [];
     return _getValidPawns(roll);
   }
 
-  /// Get all pawns stacked with a given pawn (same position, same player)
   List<Pawn> getStackedPawns(Pawn pawn) {
     if (pawn.isHome || !pawn.isActive) return [pawn];
-    
     final pos = pawnController.getPawnPosition(pawn);
     if (pos == null) return [pawn];
-    
     final square = boardController.getSquare(pos);
     if (square == null) return [pawn];
-    
     return square.getFriendlyPawns(pawn.playerId);
   }
-  
-  /// Check if a pawn has stackable pawns (for stacked movement decision)
-  bool hasStackedPawns(Pawn pawn) {
-    return getStackedPawns(pawn).length > 1;
-  }
-  
-  /// Check if pawn is on inner path (stacking allowed here)
+
+  bool hasStackedPawns(Pawn pawn) => getStackedPawns(pawn).length > 1;
+
   bool isPawnOnInnerPath(Pawn pawn) {
     if (!pawn.isActive || pawn.isHome) return false;
     return pawn.currentPath == PathType.inner;
   }
-  
-  /// Check if current roll allows stacked movement (any roll value in inner path)
-  bool rollAllowsStackedMovement() {
-    final roll = cowryController.lastRoll;
-    return roll != null;
-  }
 
-  /// Callback for stacked pawn dialog choice - passes pawn and count of pawns to move
-  Function(Pawn pawn, int pawnCount)? onStackedPawnChoice;
-
-  /// Select and move a pawn (optionally with stacked pawns)
+  /// Select and move a pawn
   MoveResult selectPawn(Pawn pawn, {int movePawnCount = 1}) {
     if (currentPhase != TurnPhase.selectingPawn) {
       feedbackService.onInvalidMove();
@@ -198,13 +374,11 @@ class GameManager {
       return MoveResult.failed('No roll available');
     }
 
-    // Validate pawn belongs to current player
     if (pawn.playerId != turnStateMachine.currentPlayerId) {
       feedbackService.onInvalidMove();
       return MoveResult.failed('Not your pawn');
     }
 
-    // Validate pawn can move
     final hasCaptured = hasPlayerCaptured(pawn.playerId);
     if (!boardController.canPawnMove(
         pawn, roll.steps, pawnController.pawns, roll.allowsEntry, hasCaptured)) {
@@ -212,29 +386,26 @@ class GameManager {
       return MoveResult.failed('Pawn cannot move');
     }
 
-    // Check if this pawn is stacked ON INNER PATH and needs dialog
+    // Check for stacked pawn dialog (human players only)
     final stackedPawns = getStackedPawns(pawn);
-    if (stackedPawns.length > 1 && isPawnOnInnerPath(pawn) && movePawnCount == 1) {
-      // Audio signal for stacked pawn choice dialog
+    if (stackedPawns.length > 1 &&
+        isPawnOnInnerPath(pawn) &&
+        movePawnCount == 1 &&
+        !isCurrentPlayerAI) {
       feedbackService.mediumTap();
-      // Ask user how many pawns to move - callback to UI
       onStackedPawnChoice?.call(pawn, stackedPawns.length);
       return MoveResult.failed('Waiting for stacked pawn choice');
     }
 
-    // Haptic for selection
     feedbackService.onPawnSelect();
     turnStateMachine.onPawnSelected();
 
-    // Execute move
     MoveResult result;
     if (pawn.isHome) {
       result = pawnController.enterPawn(pawn);
       feedbackService.onPawnEnter();
     } else {
-      // movePawnCount > 1 means move multiple stacked pawns
       if (movePawnCount > 1 && stackedPawns.length >= movePawnCount) {
-        // Move specified number of stacked pawns together
         final pawnsToMove = stackedPawns.take(movePawnCount).toList();
         result = pawnController.moveStackedPawns(pawnsToMove, roll.steps);
       } else {
@@ -242,22 +413,19 @@ class GameManager {
       }
       feedbackService.onPawnMove();
     }
-    
-    // Track capture
+
     if (result.killedOpponent) {
-      captureCount[pawn.playerId] = (captureCount[pawn.playerId] ?? 0) + result.victims.length;
+      captureCount[pawn.playerId] =
+          (captureCount[pawn.playerId] ?? 0) + result.victims.length;
       feedbackService.onCapture();
     }
-    
-    // Check if reached center
+
     if (result.reachedCenter) {
       feedbackService.onPawnFinish();
     }
 
-    // Handle move result
     turnStateMachine.onMoveComplete(result);
 
-    // Check if player finished
     if (pawnController.hasPlayerWon(pawn.playerId)) {
       turnStateMachine.markPlayerFinished(pawn.playerId);
       players[pawn.playerId].rank = turnStateMachine.getRank(pawn.playerId);
@@ -273,7 +441,7 @@ class GameManager {
 
   void _checkGameState() {
     if (turnStateMachine.isGameOver) {
-      // Mark last player
+      _cancelAITimers();
       final lastPlace = turnStateMachine.lastPlacePlayerId;
       if (lastPlace != null) {
         players[lastPlace].rank = playerCount;
@@ -281,47 +449,42 @@ class GameManager {
       onGameOver?.call(turnStateMachine.winnerId!);
     } else if (turnStateMachine.extraTurnPending ||
         currentPhase == TurnPhase.checkingExtraTurn) {
-      // Check for extra turn
       if (turnStateMachine.extraTurnPending) {
         feedbackService.onExtraTurn();
         onExtraTurn?.call();
       }
       turnStateMachine.endTurn();
-      
-      // Notify turn change
+
       if (!turnStateMachine.extraTurnPending) {
         feedbackService.onTurnStart();
       }
-    }
 
+      // Schedule AI roll if next turn is AI
+      if (isCurrentPlayerAI && !isGameOver) {
+        scheduleAIRoll();
+      }
+    }
     onStateChanged?.call();
   }
 
-  /// End current turn manually
   void endTurn() {
     turnStateMachine.endTurn();
+    if (isCurrentPlayerAI && !isGameOver) {
+      scheduleAIRoll();
+    }
     onStateChanged?.call();
   }
 
-  /// Get all pawns
   List<Pawn> get allPawns => pawnController.pawns;
 
-  /// Get pawns for current player
   List<Pawn> get currentPlayerPawns =>
       pawnController.getPawnsForPlayer(turnStateMachine.currentPlayerId);
 
-  /// Get pawn position on board
   Position? getPawnPosition(Pawn pawn) => pawnController.getPawnPosition(pawn);
-
-  /// Get square at position
   Square? getSquare(Position pos) => boardController.getSquare(pos);
 
-  /// Reset game
-  void reset() {
-    startGame(players: playerCount);
-  }
+  void reset() => startGame(players: playerCount, config: gameConfig);
 
-  /// Get rankings
   List<Player> get rankings {
     final ranked = <Player>[];
     for (final playerId in turnStateMachine.rankings) {

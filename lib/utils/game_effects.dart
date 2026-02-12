@@ -16,7 +16,7 @@ class GameEffects {
     required AnimationController controller,
     double intensity = 8.0,
   }) {
-    return AnimatedBuilder(
+    return GameAnimatedBuilder(
       animation: controller,
       builder: (context, _) {
         if (!controller.isAnimating) return child;
@@ -40,7 +40,7 @@ class GameEffects {
     required AnimationController controller,
     Color color = Colors.white,
   }) {
-    return AnimatedBuilder(
+    return GameAnimatedBuilder(
       animation: controller,
       builder: (context, _) {
         // Flash peaks at 30% then fades out
@@ -88,7 +88,7 @@ class GameEffects {
     Color color = const Color(0xFFFFD700),
     int rayCount = 12,
   }) {
-    return AnimatedBuilder(
+    return GameAnimatedBuilder(
       animation: controller,
       builder: (context, _) {
         return CustomPaint(
@@ -214,12 +214,12 @@ class GameDecorations {
   /// Golden glow for CHOWKA celebrations
   static List<BoxShadow> get chowkaGlow => [
     BoxShadow(
-      color: DesignSystem.accentGold.withAlpha(AnimationConfig.graceThrowGlowIntensity),
+      color: DesignSystem.accent.withAlpha(AnimationConfig.graceThrowGlowIntensity),
       blurRadius: 24,
       spreadRadius: 4,
     ),
     BoxShadow(
-      color: DesignSystem.accentGold.withAlpha(100),
+      color: DesignSystem.accent.withAlpha(100),
       blurRadius: 40,
       spreadRadius: 8,
     ),
@@ -256,7 +256,7 @@ class GameDecorations {
       spreadRadius: 6,
     ),
     BoxShadow(
-      color: DesignSystem.accentGold.withAlpha(100),
+      color: DesignSystem.accent.withAlpha(100),
       blurRadius: 50,
       spreadRadius: 10,
     ),

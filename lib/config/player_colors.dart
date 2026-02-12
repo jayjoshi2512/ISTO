@@ -1,21 +1,21 @@
 import 'dart:ui';
 
 /// UNIFIED Player Colors - Single Source of Truth
-/// Use this class everywhere for player colors to ensure consistency
+/// Rich jewel-toned colors inspired by Indian textiles and gemstones 
 class PlayerColors {
   // ============ PLAYER COLORS (Consistent across all UI) ============
   
-  /// Player 0 - Bottom position (Coral Red)
-  static const Color player0 = Color(0xFFE57373);
+  /// Player 0 - Bottom position (Ruby Red — like a garnet gemstone)
+  static const Color player0 = Color(0xFFD94B4B);
   
-  /// Player 1 - Top position (Green)
-  static const Color player1 = Color(0xFF81C784);
+  /// Player 1 - Top position (Emerald Green — deep lush green)
+  static const Color player1 = Color(0xFF27AE60);
   
-  /// Player 2 - Left position (Yellow/Amber)
-  static const Color player2 = Color(0xFFFFD54F);
+  /// Player 2 - Left position (Saffron Gold — warm amber-gold)
+  static const Color player2 = Color(0xFFE6A817);
   
-  /// Player 3 - Right position (Blue)
-  static const Color player3 = Color(0xFF64B5F6);
+  /// Player 3 - Right position (Royal Blue — deep sapphire)
+  static const Color player3 = Color(0xFF3498DB);
   
   /// List of all player colors for indexed access
   static const List<Color> colors = [
@@ -27,10 +27,10 @@ class PlayerColors {
   
   /// Player names corresponding to colors
   static const List<String> names = [
-    'Red',
-    'Green', 
-    'Yellow',
-    'Blue',
+    'Ruby',
+    'Emerald', 
+    'Saffron',
+    'Sapphire',
   ];
   
   /// Get color for player by ID (0-3)
@@ -54,9 +54,9 @@ class PlayerColors {
     final color = getColor(playerId);
     return Color.fromARGB(
       color.a.toInt(),
-      _clamp(color.r.toInt() + 40),
-      _clamp(color.g.toInt() + 40),
-      _clamp(color.b.toInt() + 40),
+      _clamp(color.r.toInt() + 45),
+      _clamp(color.g.toInt() + 45),
+      _clamp(color.b.toInt() + 45),
     );
   }
   
@@ -65,9 +65,9 @@ class PlayerColors {
     final color = getColor(playerId);
     return Color.fromARGB(
       color.a.toInt(),
-      _clamp(color.r.toInt() - 40),
-      _clamp(color.g.toInt() - 40),
-      _clamp(color.b.toInt() - 40),
+      _clamp(color.r.toInt() - 50),
+      _clamp(color.g.toInt() - 50),
+      _clamp(color.b.toInt() - 50),
     );
   }
   

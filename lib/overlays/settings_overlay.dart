@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
-import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
 
-/// Premium settings overlay with glassmorphism and smooth animations
+/// Settings overlay with sound/haptics toggles and game options
 class SettingsOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -16,262 +15,243 @@ class SettingsOverlay extends StatefulWidget {
 }
 
 class _SettingsOverlayState extends State<SettingsOverlay>
-    with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late AnimationController _itemController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _slideAnimation;
-
-  bool _soundEnabled = true;
-  bool _hapticsEnabled = true;
-  int _gameFeelProfile = GameFeelConfig.currentProfile;
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _fade;
+  late Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    _soundEnabled = feedbackService.soundEnabled;
-    _hapticsEnabled = feedbackService.hapticsEnabled;
-    _gameFeelProfile = GameFeelConfig.currentProfile;
-
-    _controller = AnimationController(
+    _ctrl = AnimationController(
+      vsync: this,
       duration: const Duration(milliseconds: 300),
-      vsync: this,
     );
-    
-    _itemController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _scale = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
     );
+    _ctrl.forward();
+  }
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-    
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-
-    _controller.forward();
-    
-    // Stagger items entrance
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        _itemController.forward();
+  void _close() {
+    _ctrl.reverse().then((_) {
+      if (mounted) {
+        widget.game.overlays.remove('settings');
       }
     });
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    _itemController.dispose();
-    super.dispose();
-  }
-
-  void _toggleSound() {
-    setState(() {
-      _soundEnabled = !_soundEnabled;
-      feedbackService.setSoundEnabled(_soundEnabled);
-    });
-    feedbackService.lightTap();
-  }
-
-  void _toggleHaptics() {
-    setState(() {
-      _hapticsEnabled = !_hapticsEnabled;
-      feedbackService.setHapticsEnabled(_hapticsEnabled);
-    });
-    if (_hapticsEnabled) {
-      feedbackService.lightTap();
-    }
-  }
-
-  void _setGameFeelProfile(int profile) {
-    setState(() {
-      _gameFeelProfile = profile;
-      GameFeelConfig.setProfile(profile);
-    });
-    feedbackService.lightTap();
-  }
-
-  void _close() {
-    feedbackService.lightTap();
-    _itemController.reverse();
-    _controller.reverse().then((_) {
-      widget.game.overlays.remove('settings');
-    });
-  }
-
-  void _showHowToPlay() {
-    feedbackService.lightTap();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _buildHowToPlaySheet(),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_controller, _itemController]),
-      builder: (context, child) {
-        return Opacity(
-          opacity: _fadeAnimation.value,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withAlpha((200 * _fadeAnimation.value).toInt()),
-                  DesignSystem.bgDark.withAlpha((220 * _fadeAnimation.value).toInt()),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Center(
-                child: Transform.translate(
-                  offset: Offset(0, _slideAnimation.value),
-                  child: Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: child,
-                  ),
-                ),
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          // Backdrop
+          GestureDetector(
+            onTap: _close,
+            child: FadeTransition(
+              opacity: _fade,
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.5),
               ),
             ),
           ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24),
-        constraints: const BoxConstraints(maxWidth: 340),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              DesignSystem.surfaceLight.withAlpha(250),
-              DesignSystem.surface.withAlpha(250),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(DesignSystem.radiusXL),
-          border: Border.all(
-            color: Colors.white.withAlpha(15),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(100),
-              blurRadius: 32,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: DesignSystem.accent.withAlpha(20),
-              blurRadius: 40,
-              spreadRadius: -10,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            _buildHeader(),
-            
-            const Divider(color: DesignSystem.border, height: 1),
-            
-            // Settings items
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  _buildToggleItem(
-                    icon: _soundEnabled ? Icons.volume_up_outlined : Icons.volume_off_outlined,
-                    label: 'Sound',
-                    value: _soundEnabled,
-                    onToggle: _toggleSound,
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  _buildToggleItem(
-                    icon: _hapticsEnabled ? Icons.vibration : Icons.smartphone_outlined,
-                    label: 'Haptics',
-                    value: _hapticsEnabled,
-                    onToggle: _toggleHaptics,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Game Feel Profile Selector
-                  _buildGameFeelSelector(),
-                  
-                  const SizedBox(height: 20),
-                  
-                  const Divider(color: DesignSystem.border),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // How to play button
-                  GestureDetector(
-                    onTap: _showHowToPlay,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+
+          // Settings panel
+          Center(
+            child: FadeTransition(
+              opacity: _fade,
+              child: ScaleTransition(
+                scale: _scale,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(24),
+                  decoration: DesignSystem.glassCard,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            Icons.help_outline,
-                            color: DesignSystem.accent,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
                           Text(
-                            'How to Play',
-                            style: DesignSystem.bodyMedium.copyWith(
-                              color: DesignSystem.accent,
+                            'Settings',
+                            style: DesignSystem.headingMedium,
+                          ),
+                          GestureDetector(
+                            onTap: _close,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: DesignSystem.surfaceGlass,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: DesignSystem.textMuted,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      const MinimalDivider(),
+                      const SizedBox(height: 16),
+
+                      // Sound toggle
+                      _SettingsTile(
+                        icon: feedbackService.soundEnabled
+                            ? Icons.volume_up_rounded
+                            : Icons.volume_off_rounded,
+                        label: 'Sound Effects',
+                        value: feedbackService.soundEnabled,
+                        onChanged: (v) {
+                          setState(() {
+                            feedbackService.setSoundEnabled(v);
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Haptics toggle
+                      _SettingsTile(
+                        icon: feedbackService.hapticsEnabled
+                            ? Icons.vibration
+                            : Icons.do_not_disturb_on_rounded,
+                        label: 'Haptic Feedback',
+                        value: feedbackService.hapticsEnabled,
+                        onChanged: (v) {
+                          setState(() {
+                            feedbackService.setHapticsEnabled(v);
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+                      const MinimalDivider(),
+                      const SizedBox(height: 16),
+
+                      // Game actions
+                      _ActionTile(
+                        icon: Icons.restart_alt_rounded,
+                        label: 'Restart Game',
+                        color: DesignSystem.warning,
+                        onTap: () {
+                          _close();
+                          widget.game.gameManager.reset();
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: Icons.home_rounded,
+                        label: 'Back to Menu',
+                        color: DesignSystem.textSecondary,
+                        onTap: () {
+                          _close();
+                          widget.game.overlays
+                              .remove(ISTOGame.turnIndicatorOverlay);
+                          widget.game.overlays
+                              .remove(ISTOGame.rollButtonOverlay);
+                          widget.game.showMenu();
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: DesignSystem.surfaceGlass,
+        borderRadius: BorderRadius.circular(DesignSystem.radiusMd),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.05),
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'SETTINGS',
-            style: DesignSystem.caption.copyWith(
-              color: DesignSystem.textSecondary,
+          Icon(icon, color: DesignSystem.textSecondary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: DesignSystem.bodyMedium.copyWith(
+                color: DesignSystem.textPrimary,
+              ),
             ),
           ),
           GestureDetector(
-            onTap: _close,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(
-                Icons.close,
-                color: DesignSystem.textMuted,
-                size: 20,
+            onTap: () => onChanged(!value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 46,
+              height: 26,
+              decoration: BoxDecoration(
+                color: value
+                    ? DesignSystem.accent.withValues(alpha: 0.3)
+                    : DesignSystem.surface,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: value
+                      ? DesignSystem.accent.withValues(alpha: 0.5)
+                      : DesignSystem.textMuted.withValues(alpha: 0.3),
+                ),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                alignment:
+                    value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: value ? DesignSystem.accent : DesignSystem.textMuted,
+                    shape: BoxShape.circle,
+                    boxShadow: value
+                        ? [
+                            BoxShadow(
+                              color: DesignSystem.accent
+                                  .withValues(alpha: 0.4),
+                              blurRadius: 6,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
               ),
             ),
           ),
@@ -279,237 +259,47 @@ class _SettingsOverlayState extends State<SettingsOverlay>
       ),
     );
   }
+}
 
-  Widget _buildToggleItem({
-    required IconData icon,
-    required String label,
-    required bool value,
-    required VoidCallback onToggle,
-  }) {
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onToggle,
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: DesignSystem.surface,
-          borderRadius: BorderRadius.circular(DesignSystem.radiusM),
-          border: Border.all(color: DesignSystem.border.withAlpha(100)),
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(DesignSystem.radiusMd),
+          border: Border.all(
+            color: color.withValues(alpha: 0.15),
+          ),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: value ? DesignSystem.accent : DesignSystem.textMuted,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: DesignSystem.bodyMedium.copyWith(
-                  color: DesignSystem.textPrimary,
-                ),
-              ),
-            ),
-            // Toggle switch
-            AnimatedContainer(
-              duration: DesignSystem.animFast,
-              width: 44,
-              height: 24,
-              decoration: BoxDecoration(
-                color: value 
-                    ? DesignSystem.accent.withAlpha(80) 
-                    : DesignSystem.bgLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: value ? DesignSystem.accent : DesignSystem.border,
-                ),
-              ),
-              child: AnimatedAlign(
-                duration: DesignSystem.animFast,
-                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: value ? DesignSystem.accent : DesignSystem.textMuted,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: DesignSystem.bodyMedium.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGameFeelSelector() {
-    final profiles = ['Minimal', 'Moderate', 'Rich'];
-    final descriptions = [
-      'Clean, focused',
-      'Balanced juice',
-      'Full experience',
-    ];
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: DesignSystem.surface,
-        borderRadius: BorderRadius.circular(DesignSystem.radiusM),
-        border: Border.all(color: DesignSystem.border.withAlpha(100)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                color: DesignSystem.accent,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Game Feel',
-                      style: DesignSystem.bodyMedium.copyWith(
-                        color: DesignSystem.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      descriptions[_gameFeelProfile],
-                      style: DesignSystem.caption.copyWith(
-                        color: DesignSystem.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Profile chips
-          Row(
-            children: List.generate(3, (index) {
-              final isSelected = _gameFeelProfile == index;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => _setGameFeelProfile(index),
-                  child: AnimatedContainer(
-                    duration: DesignSystem.animFast,
-                    margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? DesignSystem.accent.withAlpha(30) 
-                          : DesignSystem.bgLight,
-                      borderRadius: BorderRadius.circular(DesignSystem.radiusS),
-                      border: Border.all(
-                        color: isSelected 
-                            ? DesignSystem.accent 
-                            : DesignSystem.border,
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      profiles[index],
-                      textAlign: TextAlign.center,
-                      style: DesignSystem.caption.copyWith(
-                        color: isSelected 
-                            ? DesignSystem.accent 
-                            : DesignSystem.textSecondary,
-                        fontWeight: isSelected 
-                            ? FontWeight.w600 
-                            : FontWeight.normal,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHowToPlaySheet() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: DesignSystem.surface,
-        borderRadius: BorderRadius.circular(DesignSystem.radiusL),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: DesignSystem.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'HOW TO PLAY',
-                  style: DesignSystem.caption.copyWith(
-                    color: DesignSystem.textMuted,
-                  ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                _buildRuleItem('🎲', 'Roll cowry shells to move'),
-                _buildRuleItem('⭐', 'Roll 4 or 8 to enter pawns'),
-                _buildRuleItem('🏠', 'Safe squares protect pawns'),
-                _buildRuleItem('⚔️', 'Capture opponents on same square'),
-                _buildRuleItem('🎯', 'Get all 4 pawns to center to win'),
-                _buildRuleItem('✨', 'Roll 4 or 8 for extra turn'),
-                
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRuleItem(String emoji, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: DesignSystem.bodyMedium.copyWith(
-                color: DesignSystem.textSecondary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

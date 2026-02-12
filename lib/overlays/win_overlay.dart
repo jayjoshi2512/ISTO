@@ -3,11 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
-import '../config/game_feel_config.dart';
 import '../game/isto_game.dart';
-import '../services/feedback_service.dart';
 
-/// Premium celebratory win overlay with enhanced confetti, fireworks, and animations
+/// Victory overlay with celebration effects and rankings
 class WinOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -17,582 +15,304 @@ class WinOverlay extends StatefulWidget {
   State<WinOverlay> createState() => _WinOverlayState();
 }
 
-class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late AnimationController _confettiController;
-  late AnimationController _glowController;
-  late AnimationController _starBurstController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _trophyAnimation;
-  late Animation<double> _glowAnimation;
-  late Animation<double> _starBurstAnimation;
-
-  // Confetti particles
-  late List<_ConfettiParticle> _particles;
-  
-  // Star burst particles for extra celebration
-  late List<_StarBurstParticle> _starBursts;
+class _WinOverlayState extends State<WinOverlay>
+    with TickerProviderStateMixin {
+  late AnimationController _entranceCtrl;
+  late AnimationController _confettiCtrl;
+  late Animation<double> _fadeIn;
+  late Animation<double> _scaleIn;
+  late List<_ConfettiParticle> _confetti;
 
   @override
   void initState() {
     super.initState();
 
-    // Main entrance animation
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+    _entranceCtrl = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeIn = CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut);
+    _scaleIn = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _entranceCtrl, curve: Curves.elasticOut),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-      ),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.1, 0.6, curve: Curves.elasticOut),
-      ),
-    );
-
-    _trophyAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.2, 0.7, curve: Curves.elasticOut),
-      ),
-    );
-
-    // Confetti animation
-    _confettiController = AnimationController(
-      duration: const Duration(milliseconds: 4000),
+    _confettiCtrl = AnimationController(
       vsync: this,
-    );
+      duration: const Duration(seconds: 4),
+    )..repeat();
 
-    // Pulsing glow animation
-    _glowController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _glowAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
-    );
-    
-    // Star burst animation
-    _starBurstController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    
-    _starBurstAnimation = CurvedAnimation(
-      parent: _starBurstController,
-      curve: Curves.easeOut,
-    );
-
-    // Initialize particles
-    _initParticles();
-
-    _controller.forward();
-    _confettiController.repeat();
-    _glowController.repeat(reverse: true);
-    
-    // Delayed star burst
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _starBurstController.forward();
-    });
-    
-    feedbackService.onWin();
-  }
-  
-  void _initParticles() {
-    final random = Random();
-    final confettiCount = GameFeelConfig.winConfettiCount;
-    
-    _particles = List.generate(confettiCount, (index) {
+    // Generate confetti
+    final rng = Random();
+    _confetti = List.generate(50, (_) {
       return _ConfettiParticle(
-        x: random.nextDouble(),
-        y: -0.1 - random.nextDouble() * 0.4,
-        size: 6 + random.nextDouble() * 10,
+        x: rng.nextDouble(),
+        speed: 0.2 + rng.nextDouble() * 0.6,
+        size: 4 + rng.nextDouble() * 8,
         color: [
-          DesignSystem.accentGold,
-          Colors.amber,
-          Colors.orange,
-          Colors.yellow,
-          Colors.white,
           DesignSystem.accent,
-        ][random.nextInt(6)],
-        speed: 0.25 + random.nextDouble() * 0.35,
-        rotation: random.nextDouble() * 360,
-        rotationSpeed: (random.nextDouble() - 0.5) * 12,
-        wobble: random.nextDouble() * 60,
-        shape: random.nextInt(3), // 0: rectangle, 1: circle, 2: star
+          const Color(0xFFFF6B6B),
+          const Color(0xFF4ECDC4),
+          const Color(0xFFFFE66D),
+          const Color(0xFFA8E6CF),
+          const Color(0xFFFF8A80),
+        ][rng.nextInt(6)],
+        wobble: rng.nextDouble() * pi * 2,
+        wobbleSpeed: 1 + rng.nextDouble() * 3,
       );
     });
-    
-    // Star bursts from center
-    _starBursts = List.generate(12, (index) {
-      final angle = (index / 12) * 2 * pi;
-      return _StarBurstParticle(
-        angle: angle,
-        distance: 80 + random.nextDouble() * 40,
-        size: 4 + random.nextDouble() * 4,
-        color: DesignSystem.accentGold.withAlpha(200),
-      );
-    });
+
+    _entranceCtrl.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    _confettiController.dispose();
-    _glowController.dispose();
-    _starBurstController.dispose();
+    _entranceCtrl.dispose();
+    _confettiCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final winner = widget.game.gameManager.winner;
-    if (winner == null) return const SizedBox.shrink();
+    final rankings = widget.game.gameManager.rankings;
+    final winner = rankings.isNotEmpty ? rankings.first : null;
+    final screen = MediaQuery.of(context).size;
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        _controller,
-        _confettiController,
-        _glowController,
-        _starBurstController,
-      ]),
-      builder: (context, child) {
-        return Stack(
-          children: [
-            // Background with radial glow
-            Opacity(
-              opacity: _fadeAnimation.value,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 1.2,
-                    colors: [
-                      winner.color.withAlpha((40 * _glowAnimation.value).toInt()),
-                      Colors.black.withAlpha(240),
-                      DesignSystem.bgDark,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Center(
-                    child: Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: child,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            
-            // Star burst layer
-            if (_starBurstAnimation.value > 0)
-              ..._buildStarBursts(context, winner.color),
-
-            // Confetti layer
-            if (_fadeAnimation.value > 0.5) ..._buildConfetti(context),
-          ],
-        );
-      },
-      child: _buildContent(winner),
-    );
-  }
-  
-  List<Widget> _buildStarBursts(BuildContext context, Color winnerColor) {
-    final size = MediaQuery.of(context).size;
-    final centerX = size.width / 2;
-    final centerY = size.height / 2 - 50; // Offset up towards trophy
-    final progress = _starBurstAnimation.value;
-    
-    return _starBursts.map((star) {
-      final distance = star.distance * progress;
-      final x = centerX + cos(star.angle) * distance;
-      final y = centerY + sin(star.angle) * distance;
-      final opacity = (1.0 - progress).clamp(0.0, 1.0);
-      
-      return Positioned(
-        left: x - star.size / 2,
-        top: y - star.size / 2,
-        child: Opacity(
-          opacity: opacity,
-          child: Container(
-            width: star.size,
-            height: star.size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: winnerColor,
-              boxShadow: [
-                BoxShadow(
-                  color: winnerColor.withAlpha(150),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  List<Widget> _buildConfetti(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final progress = _confettiController.value;
-
-    return _particles.map((particle) {
-      final y = particle.y + progress * particle.speed * 1.5;
-      if (y > 1.2) return const SizedBox.shrink();
-
-      final x = particle.x + sin(progress * 3 + particle.wobble) * 0.06;
-      final rotation =
-          particle.rotation + progress * particle.rotationSpeed * 360;
-      final fadeOut = y > 0.9 ? (1.2 - y) / 0.3 : 1.0;
-
-      return Positioned(
-        left: x * size.width - particle.size / 2,
-        top: y * size.height,
-        child: Transform.rotate(
-          angle: rotation * 3.14159 / 180,
-          child: Opacity(
-            opacity: (fadeOut * 0.9).clamp(0.0, 1.0),
-            child: _buildConfettiShape(particle),
-          ),
-        ),
-      );
-    }).toList();
-  }
-  
-  Widget _buildConfettiShape(_ConfettiParticle particle) {
-    switch (particle.shape) {
-      case 0: // Rectangle
-        return Container(
-          width: particle.size,
-          height: particle.size * 0.5,
-          decoration: BoxDecoration(
-            color: particle.color,
-            borderRadius: BorderRadius.circular(2),
-            boxShadow: [
-              BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
-            ],
-          ),
-        );
-      case 1: // Circle
-        return Container(
-          width: particle.size * 0.7,
-          height: particle.size * 0.7,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: particle.color,
-            boxShadow: [
-              BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
-            ],
-          ),
-        );
-      case 2: // Star shape (diamond)
-      default:
-        return Transform.rotate(
-          angle: pi / 4,
-          child: Container(
-            width: particle.size * 0.6,
-            height: particle.size * 0.6,
-            decoration: BoxDecoration(
-              color: particle.color,
-              borderRadius: BorderRadius.circular(2),
-              boxShadow: [
-                BoxShadow(color: particle.color.withAlpha(100), blurRadius: 4),
-              ],
-            ),
-          ),
-        );
-    }
-  }
-
-  Widget _buildContent(dynamic winner) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32),
-      padding: const EdgeInsets.all(32),
-      constraints: const BoxConstraints(maxWidth: 340),
-      decoration: BoxDecoration(
-        gradient: DesignSystem.cardGradient,
-        borderRadius: BorderRadius.circular(DesignSystem.radiusXL),
-        border: Border.all(color: winner.color.withAlpha(150), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: winner.color.withAlpha(60),
-            blurRadius: 40,
-            spreadRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
         children: [
-          // Trophy with pulsing glow
-          AnimatedBuilder(
-            animation: Listenable.merge([_trophyAnimation, _glowAnimation]),
-            builder: (context, child) {
-              return Transform.scale(
-                scale:
-                    _trophyAnimation.value *
-                    (0.95 + _glowAnimation.value * 0.1),
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: DesignSystem.goldGradient,
-                    boxShadow: [
-                      ...DesignSystem.glowGold,
-                      BoxShadow(
-                        color: DesignSystem.accentGold.withAlpha(
-                          (100 * _glowAnimation.value).toInt(),
-                        ),
-                        blurRadius: 30 + 20 * _glowAnimation.value,
-                        spreadRadius: 5 * _glowAnimation.value,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.emoji_events,
-                    size: 48,
-                    color: DesignSystem.bgDark,
-                  ),
+          // Dark backdrop
+          FadeTransition(
+            opacity: _fadeIn,
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.75),
+            ),
+          ),
+
+          // Confetti layer
+          GameAnimatedBuilder(
+            animation: _confettiCtrl,
+            builder: (context, _) {
+              return CustomPaint(
+                size: screen,
+                painter: _ConfettiPainter(
+                  particles: _confetti,
+                  progress: _confettiCtrl.value,
                 ),
               );
             },
           ),
 
-          const SizedBox(height: 24),
-
-          // Winner announcement
-          Text(
-            'VICTORY',
-            style: DesignSystem.caption.copyWith(
-              color: DesignSystem.accentGold,
-              letterSpacing: 4,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            '${winner.name} Wins!',
-            style: DesignSystem.headingMedium.copyWith(color: winner.color),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Rankings
-          _buildRankings(),
-
-          const SizedBox(height: 32),
-
-          // Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: _buildButton('Play Again', DesignSystem.accent, () {
-                  feedbackService.mediumTap();
-                  widget.game.startNewGame(widget.game.gameManager.playerCount);
-                }, isPrimary: true),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildButton('Menu', DesignSystem.textMuted, () {
-                  feedbackService.lightTap();
-                  widget.game.showMenu();
-                }, isPrimary: false),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRankings() {
-    final rankings = widget.game.gameManager.rankings;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: DesignSystem.bgDark.withAlpha(150),
-        borderRadius: BorderRadius.circular(DesignSystem.radiusM),
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < rankings.length; i++)
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: Duration(milliseconds: 400 + i * 150),
-              curve: Curves.easeOutBack,
-              builder: (context, value, child) {
-                return Transform.translate(
-                  offset: Offset(30 * (1 - value), 0),
-                  child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
-                );
-              },
-              child: Padding(
-                padding: EdgeInsets.only(top: i > 0 ? 8 : 0),
-                child: Row(
-                  children: [
-                    // Rank with glow for winner
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color:
-                            i == 0
-                                ? DesignSystem.accentGold.withAlpha(50)
-                                : DesignSystem.surface,
-                        shape: BoxShape.circle,
-                        boxShadow:
-                            i == 0
-                                ? [
-                                  BoxShadow(
-                                    color: DesignSystem.accentGold.withAlpha(
-                                      60,
-                                    ),
-                                    blurRadius: 8,
-                                  ),
-                                ]
-                                : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: TextStyle(
-                            color:
-                                i == 0
-                                    ? DesignSystem.accentGold
-                                    : DesignSystem.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
+          // Content
+          Center(
+            child: FadeTransition(
+              opacity: _fadeIn,
+              child: ScaleTransition(
+                scale: _scaleIn,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(28),
+                  decoration: DesignSystem.glassCard.copyWith(
+                    border: Border.all(
+                      color: winner != null
+                          ? winner.color.withValues(alpha: 0.3)
+                          : DesignSystem.accent.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Trophy icon
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: DesignSystem.goldGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: DesignSystem.glowShadow,
+                        ),
+                        child: const Icon(
+                          Icons.emoji_events_rounded,
+                          color: Color(0xFF1A0E04),
+                          size: 32,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
 
-                    const SizedBox(width: 12),
+                      // Victory text
+                      Text(
+                        'VICTORY!',
+                        style: DesignSystem.headingLarge.copyWith(
+                          letterSpacing: 4,
+                          foreground: Paint()
+                            ..shader = DesignSystem.goldGradient
+                                .createShader(
+                                    const Rect.fromLTWH(0, 0, 200, 40)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
 
-                    // Player dot with glow
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: rankings[i].color,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: rankings[i].color.withAlpha(150),
-                            blurRadius: 6,
+                      if (winner != null) ...[
+                        Text(
+                          '${winner.name} wins!',
+                          style: DesignSystem.bodyLarge.copyWith(
+                            color: winner.color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+                      const MinimalDivider(),
+                      const SizedBox(height: 20),
+
+                      // Rankings list
+                      ...rankings.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final player = entry.value;
+                        final medals = ['🥇', '🥈', '🥉', '4th'];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 32,
+                                child: Text(
+                                  index < 3 ? medals[index] : medals[3],
+                                  style: DesignSystem.bodyLarge,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: player.color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  player.name,
+                                  style: DesignSystem.bodyMedium.copyWith(
+                                    color: index == 0
+                                        ? DesignSystem.textPrimary
+                                        : DesignSystem.textSecondary,
+                                    fontWeight: index == 0
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 28),
+
+                      // Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: PremiumButton(
+                              label: 'PLAY AGAIN',
+                              onTap: () {
+                                widget.game.gameManager.reset();
+                                widget.game.overlays
+                                    .remove(ISTOGame.winOverlay);
+                                widget.game.overlays
+                                    .add(ISTOGame.turnIndicatorOverlay);
+                                if (!widget.game.gameManager
+                                    .isCurrentPlayerAI) {
+                                  widget.game.overlays
+                                      .add(ISTOGame.rollButtonOverlay);
+                                }
+                              },
+                              icon: Icons.replay_rounded,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: PremiumButton(
+                              label: 'MENU',
+                              onTap: () {
+                                widget.game.overlays
+                                    .remove(ISTOGame.winOverlay);
+                                widget.game.overlays
+                                    .remove(ISTOGame.turnIndicatorOverlay);
+                                widget.game.overlays
+                                    .remove(ISTOGame.rollButtonOverlay);
+                                widget.game.showMenu();
+                              },
+                              isPrimary: false,
+                              icon: Icons.home_rounded,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    // Player name
-                    Expanded(
-                      child: Text(
-                        rankings[i].name,
-                        style: DesignSystem.bodyMedium.copyWith(
-                          color:
-                              i == 0
-                                  ? DesignSystem.textPrimary
-                                  : DesignSystem.textSecondary,
-                          fontWeight:
-                              i == 0 ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildButton(
-    String text,
-    Color color,
-    VoidCallback onTap, {
-    bool isPrimary = true,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isPrimary ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
-          border: isPrimary ? null : Border.all(color: DesignSystem.border),
-          boxShadow: isPrimary ? DesignSystem.glowAccent : null,
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: DesignSystem.button.copyWith(
-              color:
-                  isPrimary
-                      ? DesignSystem.textPrimary
-                      : DesignSystem.textSecondary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
-/// Confetti particle data class
 class _ConfettiParticle {
   final double x;
-  final double y;
+  final double speed;
   final double size;
   final Color color;
-  final double speed;
-  final double rotation;
-  final double rotationSpeed;
   final double wobble;
-  final int shape;
+  final double wobbleSpeed;
 
   _ConfettiParticle({
     required this.x,
-    required this.y,
+    required this.speed,
     required this.size,
     required this.color,
-    required this.speed,
-    required this.rotation,
-    required this.rotationSpeed,
     required this.wobble,
-    required this.shape,
+    required this.wobbleSpeed,
   });
 }
 
-/// Star burst particle for celebration effect
-class _StarBurstParticle {
-  final double angle;
-  final double distance;
-  final double size;
-  final Color color;
+class _ConfettiPainter extends CustomPainter {
+  final List<_ConfettiParticle> particles;
+  final double progress;
 
-  _StarBurstParticle({
-    required this.angle,
-    required this.distance,
-    required this.size,
-    required this.color,
-  });
+  _ConfettiPainter({required this.particles, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final y = (progress * p.speed * 2) % 1.2;
+      if (y > 1.0) continue;
+      final x = p.x + sin(progress * p.wobbleSpeed * pi * 2 + p.wobble) * 0.05;
+      final rect = Rect.fromCenter(
+        center: Offset(x * size.width, y * size.height),
+        width: p.size,
+        height: p.size * 0.6,
+      );
+      canvas.save();
+      canvas.translate(rect.center.dx, rect.center.dy);
+      canvas.rotate(progress * p.wobbleSpeed * 2);
+      canvas.translate(-rect.center.dx, -rect.center.dy);
+      canvas.drawRect(
+        rect,
+        Paint()..color = p.color.withValues(alpha: (1.0 - y) * 0.8),
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter old) => true;
 }

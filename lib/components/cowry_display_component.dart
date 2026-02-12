@@ -1,409 +1,434 @@
 import 'dart:math';
+import 'dart:ui' as ui;
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-import '../config/design_system.dart';
-import '../config/animation_config.dart';
 import '../models/models.dart';
 
-/// Enhanced cowry display with dramatic animations
+/// Displays 4 cowry shells with authentic design, roll animation, and result
 /// 
-/// Features:
-/// - Extended roll animation with varied timing
-/// - Dramatic reveal pause before showing result
-/// - Glowing effect for CHOWKA/ASHTA rolls
-/// - Scale pulse on special rolls
-/// - More energetic shell bouncing and rotation
+/// Cowry shells are the traditional dice used in ISTO (Chowka Bhara).
+/// - Mouth-up (flat side up): Ivory shell with natural opening/slit
+/// - Mouth-down (dome side up): Brown textured shell with ridge line & spots
 class CowryDisplayComponent extends PositionComponent {
-  CowryRoll? currentRoll;
-  bool _isAnimating = false;
-  bool _isRevealing = false;  // Post-roll reveal phase
-  double _animationProgress = 0;
-  double _revealProgress = 0;  // For dramatic reveal
-  double _glowIntensity = 0;  // For grace throw glow
-  final Random _random = Random();
-  
-  // Individual shell animation states
-  final List<_ShellState> _shellStates = List.generate(4, (_) => _ShellState());
+  CowryRoll? _currentRoll;
+  double _rollAnimTime = 0;
+  bool _isRolling = false;
+  bool _showResult = false;
+  double _resultShowTime = 0;
+  bool _notifiedAnimComplete = false;
 
-  // Colors matching new design system
-  static const Color bgColor = DesignSystem.surface;
-  static const Color shellLight = Color(0xFFF5E6D3); // Light cream shell
-  static const Color shellDark = Color(0xFFD4A574); // Spotted shell back
-  static const Color spotColor = Color(0xFF8B6914); // Brown spots
-  static const Color openingColor = Color(0xFF2D1810); // Dark opening
-  static const Color borderColor = DesignSystem.border;
-  
-  // Grace throw colors
-  static const Color chowkaGlow = Color(0xFFFFD700);  // Gold for CHOWKA
-  static const Color ashtaGlow = Color(0xFFFF6B6B);   // Red for ASHTA
+  /// Callback when roll animation finishes
+  final VoidCallback? onAnimationComplete;
+
+  // Shell animation states (random per shell for organic feel)
+  final List<double> _shellPhases = List.generate(4, (i) => i * 0.7 + Random().nextDouble() * 0.5);
+  final List<double> _shellBounce = List.generate(4, (_) => 0.0);
 
   CowryDisplayComponent({
     required Vector2 position,
+    this.onAnimationComplete,
   }) : super(
           position: position,
-          size: Vector2(180, 80),
+          size: Vector2(220, 60),
           anchor: Anchor.center,
         );
 
-  @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-
-    // Calculate glow color for grace throws
-    Color? glowColor;
-    if (currentRoll != null && currentRoll!.grantsExtraTurn && _glowIntensity > 0) {
-      glowColor = currentRoll!.isChowka ? chowkaGlow : ashtaGlow;
-    }
-
-    // Background panel with conditional glow
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.x, size.y),
-      const Radius.circular(16),
-    );
-    
-    // Grace throw glow effect (outer)
-    if (glowColor != null && _glowIntensity > 0.1) {
-      canvas.drawRRect(
-        rect.inflate(4 + (_glowIntensity * 6)),
-        Paint()
-          ..color = glowColor.withAlpha((_glowIntensity * 80).toInt())
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 12 + (_glowIntensity * 8)),
-      );
-    }
-    
-    // Clean dark background
-    canvas.drawRRect(
-      rect, 
-      Paint()..color = DesignSystem.surface,
-    );
-    
-    // Border - glows on grace throws
-    canvas.drawRRect(
-      rect,
-      Paint()
-        ..color = glowColor?.withAlpha((_glowIntensity * 200 + 55).toInt()) ?? borderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = glowColor != null ? 1.5 + (_glowIntensity * 0.5) : 1,
-    );
-
-    // Calculate panel scale for reveal punch
-    double panelScale = 1.0;
-    if (_isRevealing && currentRoll != null && currentRoll!.grantsExtraTurn) {
-      // Quick punch on reveal
-      final revealPunch = sin(_revealProgress * pi * 2) * 0.08 * (1 - _revealProgress);
-      panelScale = 1.0 + revealPunch;
-    }
-    
-    // Apply scale for reveal
-    canvas.save();
-    canvas.translate(size.x / 2, size.y / 2);
-    canvas.scale(panelScale, panelScale);
-    canvas.translate(-size.x / 2, -size.y / 2);
-
-    // Draw cowries (4 shells)
-    final shellWidth = 28.0;
-    final shellHeight = 18.0;
-    final totalWidth = 4 * shellWidth + 3 * 8;
-    final startX = (size.x - totalWidth) / 2;
-    
+  void showRoll(CowryRoll roll) {
+    _currentRoll = roll;
+    _isRolling = true;
+    _showResult = false;
+    _rollAnimTime = 0;
+    _resultShowTime = 0;
+    _notifiedAnimComplete = false;
+    // Randomize phases for each new roll
     for (int i = 0; i < 4; i++) {
-      final x = startX + i * (shellWidth + 8) + shellWidth / 2;
-      final y = size.y / 2 - 5;
-      
-      _drawCowryShell(canvas, Offset(x, y), shellWidth, shellHeight, i);
+      _shellPhases[i] = i * 0.6 + Random().nextDouble() * 0.8;
+      _shellBounce[i] = 0.0;
     }
-
-    // Result text with enhanced styling
-    if (currentRoll != null && !_isAnimating) {
-      _drawResultText(canvas);
-    }
-    
-    canvas.restore();
-  }
-
-  void _drawCowryShell(Canvas canvas, Offset center, double width, double height, int index) {
-    final state = _shellStates[index];
-    bool isUp;
-    double bounce = 0;
-    double rotation = 0;
-    double scale = 1.0;
-    
-    if (_isAnimating) {
-      // Enhanced animation with more energy
-      final phase = _animationProgress * AnimationConfig.cowryFlipCount;
-      final decay = pow(1 - _animationProgress, 1.5).toDouble();
-      
-      // Faster, more chaotic flipping during animation
-      isUp = sin(phase * 3 + index * 2) > 0;
-      
-      // More dynamic bounce with individual timing
-      bounce = sin(phase * 2 + index * 1.2) * 12 * decay;
-      
-      // More rotation variety
-      rotation = sin(phase * 2.5 + index * 1.8) * 0.7 * decay;
-      
-      // Scale variation for depth
-      scale = 1.0 + sin(phase * 1.5 + index * 0.8) * 0.15 * decay;
-    } else if (currentRoll != null) {
-      isUp = currentRoll!.cowries[index];
-      rotation = state.settledRotation;
-      
-      // Settled bounce with gentle settle
-      if (_isRevealing) {
-        // Landing bounce effect
-        final settlePhase = _revealProgress;
-        if (settlePhase < 0.3) {
-          bounce = sin(settlePhase / 0.3 * pi) * 3 * (1 - settlePhase / 0.3);
-        }
-      }
-    } else {
-      isUp = false;
-      rotation = 0;
-    }
-
-    canvas.save();
-    canvas.translate(center.dx, center.dy - bounce);
-    canvas.rotate(rotation);
-    canvas.scale(scale, scale);
-    
-    // Create shell path
-    final shellPath = _createCowryPath(width, height);
-    
-    // Enhanced drop shadow
-    canvas.drawPath(
-      shellPath.shift(Offset(2, 3 + bounce * 0.1)),
-      Paint()
-        ..color = Colors.black.withAlpha(50 + (bounce.abs() * 2).toInt())
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 + bounce.abs() * 0.2),
-    );
-    
-    if (isUp) {
-      _drawShellOpening(canvas, width, height);
-    } else {
-      _drawShellBack(canvas, width, height);
-    }
-    
-    canvas.restore();
-  }
-
-  Path _createCowryPath(double width, double height) {
-    final path = Path();
-    final w = width / 2;
-    final h = height / 2;
-    
-    path.moveTo(-w, 0);
-    path.cubicTo(-w, -h * 1.1, -w * 0.3, -h * 1.3, 0, -h);
-    path.cubicTo(w * 0.3, -h * 1.3, w, -h * 1.1, w, 0);
-    path.cubicTo(w, h * 1.1, w * 0.3, h * 1.3, 0, h);
-    path.cubicTo(-w * 0.3, h * 1.3, -w, h * 1.1, -w, 0);
-    path.close();
-    
-    return path;
-  }
-
-  void _drawShellOpening(Canvas canvas, double width, double height) {
-    final path = _createCowryPath(width, height);
-    
-    canvas.drawPath(path, Paint()..color = shellLight);
-    
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(-width * 0.1, -height * 0.1), width: width * 0.5, height: height * 0.4),
-      Paint()..color = Colors.white.withAlpha(120),
-    );
-    
-    final openingPath = Path();
-    openingPath.moveTo(-width * 0.35, 0);
-    openingPath.quadraticBezierTo(0, -height * 0.1, width * 0.35, 0);
-    openingPath.quadraticBezierTo(0, height * 0.1, -width * 0.35, 0);
-    canvas.drawPath(openingPath, Paint()..color = openingColor);
-    
-    for (int i = 0; i < 8; i++) {
-      final t = (i + 0.5) / 8;
-      final x = width * 0.35 * (1 - 2 * t);
-      canvas.drawLine(
-        Offset(x, -height * 0.05),
-        Offset(x, height * 0.05),
-        Paint()
-          ..color = Colors.brown.shade300
-          ..strokeWidth = 1,
-      );
-    }
-    
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.brown.shade400
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  void _drawShellBack(Canvas canvas, double width, double height) {
-    final path = _createCowryPath(width, height);
-    
-    canvas.drawPath(path, Paint()..color = shellDark);
-    
-    for (int i = 0; i < 12; i++) {
-      final angle = (i * 3.14159 * 2 / 12) + _random.nextDouble() * 0.3;
-      final radius = width * 0.25 * (0.4 + _random.nextDouble() * 0.4);
-      final x = cos(angle) * radius * 0.8;
-      final y = sin(angle) * radius * 0.5;
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        2 + _random.nextDouble() * 2,
-        Paint()..color = spotColor.withAlpha(150 + _random.nextInt(80)),
-      );
-    }
-    
-    final highlightPath = Path();
-    highlightPath.addOval(Rect.fromCenter(
-      center: Offset(-width * 0.15, -height * 0.15),
-      width: width * 0.4,
-      height: height * 0.3,
-    ));
-    canvas.drawPath(highlightPath, Paint()..color = Colors.white.withAlpha(50));
-    
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.brown.shade800
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  void _drawResultText(Canvas canvas) {
-    final roll = currentRoll!;
-    String label;
-    Color labelColor;
-    double fontSize;
-    List<Shadow> shadows;
-    
-    if (roll.isChowka) {
-      label = 'CHOWKA';
-      labelColor = chowkaGlow;
-      fontSize = 15;
-      shadows = [
-        Shadow(color: chowkaGlow.withAlpha(180), blurRadius: 12),
-        Shadow(color: chowkaGlow.withAlpha(100), blurRadius: 20),
-      ];
-    } else if (roll.isAshta) {
-      label = 'ASHTA';
-      labelColor = ashtaGlow;
-      fontSize = 15;
-      shadows = [
-        Shadow(color: ashtaGlow.withAlpha(180), blurRadius: 12),
-        Shadow(color: ashtaGlow.withAlpha(100), blurRadius: 20),
-      ];
-    } else {
-      label = '${roll.steps}';
-      labelColor = Colors.white;
-      fontSize = 18;
-      shadows = [
-        Shadow(color: Colors.white.withAlpha(60), blurRadius: 6),
-      ];
-    }
-    
-    // Apply reveal scale for dramatic entrance
-    final textScale = _isRevealing ? 0.8 + (_revealProgress * 0.2) : 1.0;
-    final textAlpha = _isRevealing ? (_revealProgress * 255).toInt() : 255;
-    
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          color: labelColor.withAlpha(textAlpha),
-          fontSize: fontSize * textScale,
-          fontWeight: FontWeight.w800,
-          letterSpacing: roll.grantsExtraTurn ? 3 : 1,
-          shadows: shadows,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset((size.x - textPainter.width) / 2, size.y - 22),
-    );
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-    
-    // Main roll animation
-    if (_isAnimating) {
-      _animationProgress += dt * 1.2;  // Slightly slower for drama
-      if (_animationProgress >= 1.0) {
-        _isAnimating = false;
-        _animationProgress = 1.0;
-        
-        // Start reveal phase
-        _isRevealing = true;
-        _revealProgress = 0;
-        
-        // Set settled positions
-        for (int i = 0; i < 4; i++) {
-          _shellStates[i].settledRotation = (_random.nextDouble() - 0.5) * 0.15;
+
+    if (_isRolling) {
+      _rollAnimTime += dt;
+
+      // Roll animation duration: 0.9 seconds with staggered settle
+      if (_rollAnimTime > 0.9) {
+        _isRolling = false;
+        _showResult = true;
+        _resultShowTime = 0;
+
+        // Fire animation complete callback
+        if (!_notifiedAnimComplete) {
+          _notifiedAnimComplete = true;
+          onAnimationComplete?.call();
         }
       }
     }
-    
-    // Reveal phase - includes dramatic pause
-    if (_isRevealing) {
-      _revealProgress += dt * 2.5;
-      
-      // Glow builds up for grace throws
-      if (currentRoll != null && currentRoll!.grantsExtraTurn) {
-        _glowIntensity = min(1.0, _revealProgress * 1.5);
-      }
-      
-      if (_revealProgress >= 1.0) {
-        _isRevealing = false;
-        _revealProgress = 1.0;
+
+    if (_showResult) {
+      _resultShowTime += dt;
+      // Update bounce-in for each shell
+      for (int i = 0; i < 4; i++) {
+        _shellBounce[i] = ((_resultShowTime * 5 - i * 0.18).clamp(0.0, 1.0));
       }
     }
-    
-    // Glow pulse for grace throws (after reveal)
-    if (!_isAnimating && !_isRevealing && currentRoll != null && currentRoll!.grantsExtraTurn) {
-      // Gentle pulse
-      _glowIntensity = 0.6 + sin(dt * 1000 % (2 * pi)) * 0.4;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+
+    if (_currentRoll == null && !_isRolling) return;
+
+    final shellWidth = 40.0;
+    final shellHeight = 26.0;
+    final spacing = 14.0;
+    final totalWidth = 4 * shellWidth + 3 * spacing;
+    final startX = -totalWidth / 2;
+
+    // Subtle ground shadow under shells
+    for (int i = 0; i < 4; i++) {
+      final x = startX + i * (shellWidth + spacing);
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(x + shellWidth / 2, 16), width: shellWidth * 0.7, height: 6),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+    }
+
+    for (int i = 0; i < 4; i++) {
+      final x = startX + i * (shellWidth + spacing);
+      final y = 0.0;
+
+      if (_isRolling) {
+        _drawRollingShell(canvas, x, y, shellWidth, shellHeight, i);
+      } else if (_currentRoll != null) {
+        final isUp = _currentRoll!.cowries[i];
+        _drawShell(canvas, x, y, shellWidth, shellHeight, isUp, i);
+      }
+    }
+
+    // Show result text below shells
+    if (_showResult && _currentRoll != null && _resultShowTime < 4.0) {
+      _drawResultText(canvas);
     }
   }
 
-  void showRoll(CowryRoll roll) {
-    _isAnimating = true;
-    _isRevealing = false;
-    _animationProgress = 0;
-    _revealProgress = 0;
-    _glowIntensity = 0;
-    currentRoll = roll;
+  void _drawRollingShell(
+      Canvas canvas, double x, double y, double w, double h, int index) {
+    // Chaotic tumbling during roll
+    final angle = _rollAnimTime * (10 + index * 2.5) + _shellPhases[index];
+    final flipProgress = sin(angle);
     
-    for (final state in _shellStates) {
-      state.randomize(_random);
+    // Vertical bounce during tumbling
+    final bounceY = sin(_rollAnimTime * (6 + index) + _shellPhases[index]) * 8;
+    // Horizontal wobble
+    final wobbleX = sin(_rollAnimTime * (4 + index) + index) * 3;
+    // Rotation
+    final rotation = sin(_rollAnimTime * (5 + index * 1.3)) * 0.2;
+
+    canvas.save();
+    canvas.translate(x + w / 2 + wobbleX, y + bounceY);
+    canvas.rotate(rotation);
+
+    // Scale Y for 3D flip effect
+    final scaleY = flipProgress.abs().clamp(0.3, 1.0);
+    canvas.scale(1, scaleY);
+
+    // During rolling show random up/down
+    final showUp = flipProgress > 0;
+    _drawShellBody(canvas, -w / 2, -h / 2, w, h, showUp);
+
+    canvas.restore();
+  }
+
+  void _drawShell(Canvas canvas, double x, double y, double w, double h,
+      bool isUp, int index) {
+    // Bounce-in entrance animation
+    final t = _shellBounce[index];
+    final bounce = _bounceOut(t);
+
+    canvas.save();
+    canvas.translate(x + w / 2, y);
+    canvas.scale(bounce.clamp(0.01, 1.2), bounce.clamp(0.01, 1.2));
+
+    _drawShellBody(canvas, -w / 2, -h / 2, w, h, isUp);
+
+    canvas.restore();
+  }
+
+  void _drawShellBody(
+      Canvas canvas, double x, double y, double w, double h, bool isUp) {
+    // Authentic cowry shell shape — more oval/elongated than rounded rect
+    final shellPath = Path();
+    final cx = x + w / 2;
+    final cy = y + h / 2;
+    
+    // Create elongated oval shape with pointed ends
+    shellPath.moveTo(x + w * 0.12, cy);
+    shellPath.cubicTo(x + w * 0.12, y + h * 0.15, x + w * 0.35, y, cx, y);
+    shellPath.cubicTo(x + w * 0.65, y, x + w * 0.88, y + h * 0.15, x + w * 0.88, cy);
+    shellPath.cubicTo(x + w * 0.88, y + h * 0.85, x + w * 0.65, y + h, cx, y + h);
+    shellPath.cubicTo(x + w * 0.35, y + h, x + w * 0.12, y + h * 0.85, x + w * 0.12, cy);
+    shellPath.close();
+
+    // Drop shadow
+    canvas.drawPath(
+      shellPath.shift(const Offset(1, 3)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+
+    if (isUp) {
+      // ========== MOUTH UP — Ivory/cream shell with natural opening ==========
+      
+      // Base gradient: warm ivory → cream
+      final gradient = ui.Gradient.linear(
+        Offset(x, y),
+        Offset(x + w * 0.3, y + h),
+        [
+          const Color(0xFFFAF3E0),  // Light ivory
+          const Color(0xFFF0E6CE),  // Warm cream
+          const Color(0xFFE8DCBF),  // Sandy cream
+        ],
+        [0.0, 0.5, 1.0],
+      );
+      canvas.drawPath(shellPath, Paint()..shader = gradient);
+
+      // Natural highlight on top-left
+      final highlightGrad = ui.Gradient.radial(
+        Offset(x + w * 0.35, y + h * 0.3),
+        w * 0.3,
+        [
+          Colors.white.withValues(alpha: 0.4),
+          Colors.white.withValues(alpha: 0.0),
+        ],
+      );
+      canvas.drawPath(shellPath, Paint()..shader = highlightGrad);
+
+      // The central slit/opening — the defining feature of mouth-up cowry
+      final slitPath = Path()
+        ..moveTo(x + w * 0.25, y + h * 0.42)
+        ..cubicTo(
+          x + w * 0.35, y + h * 0.58,
+          x + w * 0.65, y + h * 0.58,
+          x + w * 0.75, y + h * 0.42,
+        );
+      canvas.drawPath(
+        slitPath,
+        Paint()
+          ..color = const Color(0xFFA08050)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0
+          ..strokeCap = StrokeCap.round,
+      );
+      // Inner slit shadow for depth
+      final innerSlitPath = Path()
+        ..moveTo(x + w * 0.30, y + h * 0.45)
+        ..cubicTo(
+          x + w * 0.38, y + h * 0.55,
+          x + w * 0.62, y + h * 0.55,
+          x + w * 0.70, y + h * 0.45,
+        );
+      canvas.drawPath(
+        innerSlitPath,
+        Paint()
+          ..color = const Color(0xFF806040).withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0
+          ..strokeCap = StrokeCap.round,
+      );
+
+      // Subtle teeth-like ridges along the slit
+      for (int i = 0; i < 6; i++) {
+        final t = 0.30 + (i * 0.08);
+        final tx = x + w * t;
+        final ty1 = y + h * (0.43 + sin(i * 0.8) * 0.02);
+        final ty2 = ty1 + h * 0.06;
+        canvas.drawLine(
+          Offset(tx, ty1),
+          Offset(tx, ty2),
+          Paint()
+            ..color = const Color(0xFFC0A070).withValues(alpha: 0.4)
+            ..strokeWidth = 0.8,
+        );
+      }
+    } else {
+      // ========== MOUTH DOWN — Brown textured dome back ==========
+      
+      // Base gradient: warm brown tones
+      final gradient = ui.Gradient.linear(
+        Offset(x, y),
+        Offset(x + w * 0.3, y + h),
+        [
+          const Color(0xFFA08060),  // Light brown
+          const Color(0xFF8A6C4A),  // Medium brown
+          const Color(0xFF6A5030),  // Dark brown
+        ],
+        [0.0, 0.5, 1.0],
+      );
+      canvas.drawPath(shellPath, Paint()..shader = gradient);
+
+      // Natural highlight on top
+      final highlightGrad = ui.Gradient.radial(
+        Offset(x + w * 0.4, y + h * 0.25),
+        w * 0.25,
+        [
+          Colors.white.withValues(alpha: 0.18),
+          Colors.white.withValues(alpha: 0.0),
+        ],
+      );
+      canvas.drawPath(shellPath, Paint()..shader = highlightGrad);
+
+      // Central ridge line (spine of the shell)
+      final ridgePath = Path()
+        ..moveTo(x + w * 0.18, cy)
+        ..cubicTo(
+          x + w * 0.35, cy - 1,
+          x + w * 0.65, cy - 1,
+          x + w * 0.82, cy,
+        );
+      canvas.drawPath(
+        ridgePath,
+        Paint()
+          ..color = const Color(0xFF5A4028)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+
+      // Natural texture spots on back
+      final spotPaint = Paint()..color = const Color(0xFF4A3520).withValues(alpha: 0.5);
+      final rng = Random(42); // fixed seed for consistent look
+      for (int i = 0; i < 5; i++) {
+        final sx = x + w * (0.25 + rng.nextDouble() * 0.5);
+        final sy = y + h * (0.25 + rng.nextDouble() * 0.5);
+        final sr = 1.5 + rng.nextDouble() * 1.0;
+        canvas.drawCircle(Offset(sx, sy), sr, spotPaint);
+      }
+      
+      // Growth rings (subtle arcs)
+      for (int i = 0; i < 2; i++) {
+        final arcPath = Path()
+          ..addArc(
+            Rect.fromCenter(
+              center: Offset(cx, cy),
+              width: w * (0.45 + i * 0.18),
+              height: h * (0.35 + i * 0.15),
+            ),
+            -0.8 + i * 0.3,
+            1.6 - i * 0.3,
+          );
+        canvas.drawPath(
+          arcPath,
+          Paint()
+            ..color = const Color(0xFF5A4028).withValues(alpha: 0.25)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.7,
+        );
+      }
     }
+
+    // Shell border — thin and elegant
+    canvas.drawPath(
+      shellPath,
+      Paint()
+        ..color = isUp ? const Color(0xFFB8A88C) : const Color(0xFF5A4830)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
+    );
   }
 
-  void reset() {
-    currentRoll = null;
-    _isAnimating = false;
-    _isRevealing = false;
-    _animationProgress = 0;
-    _revealProgress = 0;
-    _glowIntensity = 0;
-  }
-}
+  void _drawResultText(Canvas canvas) {
+    if (_currentRoll == null) return;
 
-/// Individual shell animation state
-class _ShellState {
-  double settledRotation = 0;
-  double bounceOffset = 0;
-  
-  void randomize(Random random) {
-    settledRotation = (random.nextDouble() - 0.5) * 0.2;
-    bounceOffset = random.nextDouble() * 0.5;
+    final roll = _currentRoll!;
+    final text = roll.displayName;
+    final isSpecial = roll.grantsExtraTurn;
+
+    final entrance = (_resultShowTime * 3).clamp(0.0, 1.0);
+    final alpha = entrance;
+    final scale = 0.5 + entrance * 0.5;
+
+    canvas.save();
+    canvas.translate(0, 36);
+    canvas.scale(scale, scale);
+
+    final color = isSpecial
+        ? Color.fromARGB(
+            (255 * alpha).toInt(), 242, 201, 76) // Antique gold for special
+        : Color.fromARGB(
+            (255 * alpha * 0.85).toInt(), 240, 230, 210); // Parchment for normal
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontSize: isSpecial ? 20 : 15,
+          fontWeight: FontWeight.w800,
+          color: color,
+          letterSpacing: isSpecial ? 4 : 1.5,
+          shadows: isSpecial
+              ? [
+                  Shadow(
+                    color: const Color(0x80F2C94C),
+                    blurRadius: 10,
+                  ),
+                  Shadow(
+                    color: const Color(0x40F2C94C),
+                    blurRadius: 20,
+                  ),
+                ]
+              : null,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(-textPainter.width / 2, 0));
+
+    // Subtitle for special rolls
+    if (isSpecial && _resultShowTime > 0.3) {
+      final subAlpha = ((_resultShowTime - 0.3) * 3).clamp(0.0, 0.7);
+      final subtitle = roll.isAshta ? '8 Steps + Extra Turn!' : '4 Steps + Extra Turn!';
+      final subPainter = TextPainter(
+        text: TextSpan(
+          text: subtitle,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Color.fromARGB((255 * subAlpha).toInt(), 196, 174, 146),
+            letterSpacing: 1,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      subPainter.layout();
+      subPainter.paint(canvas, Offset(-subPainter.width / 2, 24));
+    }
+
+    canvas.restore();
+  }
+
+  double _bounceOut(double t) {
+    if (t < 1 / 2.75) {
+      return 7.5625 * t * t;
+    } else if (t < 2 / 2.75) {
+      t -= 1.5 / 2.75;
+      return 7.5625 * t * t + 0.75;
+    } else if (t < 2.5 / 2.75) {
+      t -= 2.25 / 2.75;
+      return 7.5625 * t * t + 0.9375;
+    } else {
+      t -= 2.625 / 2.75;
+      return 7.5625 * t * t + 0.984375;
+    }
   }
 }

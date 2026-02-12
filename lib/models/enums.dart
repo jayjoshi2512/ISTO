@@ -1,4 +1,4 @@
-/// Core enumerations for ISTO game
+// Core enumerations for ISTO game
 
 /// Type of square on the board
 enum SquareType {
