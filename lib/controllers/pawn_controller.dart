@@ -3,7 +3,7 @@ import '../models/models.dart';
 import 'board_controller.dart';
 
 /// Controls pawn state, movement, and collision resolution
-/// 
+///
 /// AUTHENTIC ISTO RULES:
 /// - Safe squares: 4 corners + center (Charkoni) - NO KILLS ALLOWED
 /// - Killing opponent sends them home and grants EXTRA TURN
@@ -20,18 +20,20 @@ class PawnController {
     pawns.clear();
     for (int p = 0; p < playerCount; p++) {
       for (int i = 0; i < 4; i++) {
-        pawns.add(Pawn(
-          id: Pawn.createId(p, i),
-          playerId: p,
-          pawnIndex: i,
-          state: PawnState.home,
-          pathIndex: -1,
-          currentPath: PathType.outer,
-        ));
+        pawns.add(
+          Pawn(
+            id: Pawn.createId(p, i),
+            playerId: p,
+            pawnIndex: i,
+            state: PawnState.home,
+            pathIndex: -1,
+            currentPath: PathType.outer,
+          ),
+        );
       }
     }
   }
-  
+
   /// Check if a position is a safe square (no kills allowed)
   bool isSafeSquare(Position pos) {
     return BoardConfig.isSafeSquare([pos.row, pos.col]);
@@ -84,7 +86,11 @@ class PawnController {
     startSquare.addPawn(pawn);
 
     if (killResult.killedOpponent) {
-      return MoveResult.entered(killedOpponent: true, victims: killResult.victims);
+      return MoveResult.entered(
+        killedOpponent: true,
+        victims: killResult.victims,
+        victimPathIndices: killResult.victimPathIndices,
+      );
     }
 
     return MoveResult.entered();
@@ -106,7 +112,10 @@ class PawnController {
     }
 
     // Get current and new positions
-    final currentPos = boardController.getPositionFromPath(pawn.playerId, pawn.pathIndex);
+    final currentPos = boardController.getPositionFromPath(
+      pawn.playerId,
+      pawn.pathIndex,
+    );
     final newPos = boardController.getPositionFromPath(pawn.playerId, newIndex);
 
     if (currentPos == null || newPos == null) {
@@ -140,7 +149,11 @@ class PawnController {
     }
 
     // Check for kills
-    final killResult = _resolveCollision(pawn, destSquare, attackerCount: attackerCount);
+    final killResult = _resolveCollision(
+      pawn,
+      destSquare,
+      attackerCount: attackerCount,
+    );
 
     // Place pawn on destination
     destSquare.addPawn(pawn);
@@ -151,6 +164,7 @@ class PawnController {
         victims: killResult.victims,
         fromIndex: fromIndex,
         toIndex: newIndex,
+        victimPathIndices: killResult.victimPathIndices,
       );
     }
 
@@ -162,50 +176,56 @@ class PawnController {
     if (stackedPawns.isEmpty) {
       return MoveResult.failed('No pawns to move');
     }
-    
+
     // All pawns should be at the same position and active
     final firstPawn = stackedPawns.first;
     if (!firstPawn.isActive) {
       return MoveResult.failed('Pawns are not active');
     }
-    
+
     final fromIndex = firstPawn.pathIndex;
     final newIndex = firstPawn.pathIndex + steps;
     final pathLength = boardController.getPathLength(firstPawn.playerId);
-    
+
     // Check if exceeds path
     if (newIndex > pathLength - 1) {
       return MoveResult.failed('Move exceeds path');
     }
-    
+
     // Get current and new positions
-    final currentPos = boardController.getPositionFromPath(firstPawn.playerId, firstPawn.pathIndex);
-    final newPos = boardController.getPositionFromPath(firstPawn.playerId, newIndex);
-    
+    final currentPos = boardController.getPositionFromPath(
+      firstPawn.playerId,
+      firstPawn.pathIndex,
+    );
+    final newPos = boardController.getPositionFromPath(
+      firstPawn.playerId,
+      newIndex,
+    );
+
     if (currentPos == null || newPos == null) {
       return MoveResult.failed('Invalid positions');
     }
-    
+
     // Remove all stacked pawns from current square
     final currentSquare = boardController.getSquare(currentPos);
     for (final pawn in stackedPawns) {
       currentSquare?.removePawn(pawn);
       // Update pawn positions
       pawn.pathIndex = newIndex;
-      
+
       // Update path type based on position
       final pathPos = boardController.playerPaths[pawn.playerId]![newIndex];
       if (BoardConfig.isInnerPath(pathPos) || BoardConfig.isCenter(pathPos)) {
         pawn.currentPath = PathType.inner;
       }
     }
-    
+
     // Get destination square
     final destSquare = boardController.getSquare(newPos);
     if (destSquare == null) {
       return MoveResult.failed('Destination square not found');
     }
-    
+
     // Check if reached center - all pawns finish
     if (destSquare.type == SquareType.center) {
       for (final pawn in stackedPawns) {
@@ -214,35 +234,44 @@ class PawnController {
       }
       return MoveResult.finished(fromIndex: fromIndex, toIndex: newIndex);
     }
-    
+
     // Check for kills - attackerCount = number of stacked pawns
-    final killResult = _resolveCollision(firstPawn, destSquare, attackerCount: stackedPawns.length);
-    
+    final killResult = _resolveCollision(
+      firstPawn,
+      destSquare,
+      attackerCount: stackedPawns.length,
+    );
+
     // Place all pawns on destination
     for (final pawn in stackedPawns) {
       destSquare.addPawn(pawn);
     }
-    
+
     if (killResult.killedOpponent) {
       return MoveResult.kill(
         type: killResult.killType,
         victims: killResult.victims,
         fromIndex: fromIndex,
         toIndex: newIndex,
+        victimPathIndices: killResult.victimPathIndices,
       );
     }
-    
+
     return MoveResult.moved(fromIndex: fromIndex, toIndex: newIndex);
   }
 
   /// Resolve collision/kill at destination square
-  /// 
+  ///
   /// AUTHENTIC ISTO RULES:
   /// - Safe squares (corners + center): NO kills allowed
   /// - Killing grants EXTRA TURN
   /// - Equal numbers can kill equal numbers (2v2, 3v3, etc.)
   /// - Cannot kill if attacker has fewer pawns than defender
-  MoveResult _resolveCollision(Pawn attacker, Square target, {int attackerCount = 1}) {
+  MoveResult _resolveCollision(
+    Pawn attacker,
+    Square target, {
+    int attackerCount = 1,
+  }) {
     // Center/Charkoni is safe - no kills
     if (target.type == SquareType.center) {
       return MoveResult.moved();
@@ -268,24 +297,31 @@ class PawnController {
     }
 
     final defenderCount = enemies.length;
-    
+
     // ISTO RULE: Can only kill if attacker count >= defender count
     // 1 can kill 1, 2 can kill 2, 2 can kill 1, but 1 cannot kill 2
     if (attackerCount < defenderCount) {
       // Cannot kill - not enough attackers
       return MoveResult.moved();
     }
-    
+
     // Kill all enemy pawns on this square if equal or more attackers
     if (attackerCount >= defenderCount) {
+      // Save victim path indices BEFORE sending home (for retreat animation)
+      final victimPaths = <String, int>{};
+      for (final enemy in enemies) {
+        victimPaths[enemy.id] = enemy.pathIndex;
+      }
+
       for (final enemy in enemies) {
         _sendPawnHome(enemy, target);
       }
-      
+
       final killType = enemies.length > 1 ? KillType.paired : KillType.single;
       return MoveResult.kill(
         type: killType,
         victims: enemies,
+        victimPathIndices: victimPaths,
       );
     }
 
@@ -301,7 +337,10 @@ class PawnController {
   /// Send pawn home (public method)
   void sendHome(Pawn pawn) {
     // Find and remove from current square
-    final currentPos = boardController.getPositionFromPath(pawn.playerId, pawn.pathIndex);
+    final currentPos = boardController.getPositionFromPath(
+      pawn.playerId,
+      pawn.pathIndex,
+    );
     if (currentPos != null) {
       final square = boardController.getSquare(currentPos);
       square?.removePawn(pawn);

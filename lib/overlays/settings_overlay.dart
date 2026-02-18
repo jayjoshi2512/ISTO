@@ -7,7 +7,7 @@ import '../services/feedback_service.dart';
 import '../theme/isto_tokens.dart';
 
 /// Settings overlay — glass card with toggles and actions.
-/// Terracotta Dusk palette, GoogleFonts Poppins.
+/// Slate & Persimmon palette, GoogleFonts Poppins.
 class SettingsOverlay extends StatefulWidget {
   final ISTOGame game;
 

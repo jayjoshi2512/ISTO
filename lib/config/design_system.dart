@@ -4,7 +4,7 @@ import '../theme/isto_tokens.dart';
 
 /// Premium design system for ISTO — Chowka Bhara
 ///
-/// "Terracotta Dusk" — warm, cultural, heritage Indian board game aesthetic.
+/// "Slate & Persimmon" — modern, high-contrast, professional board game aesthetic.
 /// Colors derived from IstoColorsDark tokens.
 class DesignSystem {
   // ========== CORE COLORS (mapped from IstoColorsDark) ==========
@@ -37,7 +37,7 @@ class DesignSystem {
   static const RadialGradient goldRadialGlow = RadialGradient(
     center: Alignment.center,
     radius: 0.8,
-    colors: [Color(0x40E8A44A), Color(0x00E8A44A)],
+    colors: [Color(0x40FF5733), Color(0x00FF5733)],
   );
 
   // ========== TYPOGRAPHY ==========
@@ -106,7 +106,7 @@ class DesignSystem {
     fontFamily: 'Poppins',
     fontSize: 16,
     fontWeight: FontWeight.w700,
-    color: Color(0xFF1A0E04),
+    color: Color(0xFFF9F9F9),
     letterSpacing: 1.2,
   );
 
@@ -181,7 +181,7 @@ class DesignSystem {
     gradient:
         pressed
             ? const LinearGradient(
-              colors: [Color(0xFFB8860B), Color(0xFFDAA520)],
+              colors: [Color(0xFFCC4425), Color(0xFFFF5733)],
             )
             : goldGradient,
     borderRadius: BorderRadius.circular(radiusFull),

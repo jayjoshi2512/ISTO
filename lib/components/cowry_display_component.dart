@@ -12,10 +12,10 @@ import '../theme/isto_tokens.dart';
 ///
 /// Implements the full UIX spec §8 animation phases:
 ///   Phase 1 — Gather   (0–150ms)   : Shells pull toward center
-///   Phase 2 — Shake    (150–550ms) : Cupped-hands shake/vibrate
-///   Phase 3 — Scatter  (550–900ms) : Shells fly out with bounceOut easing
-///   Phase 4 — Settle   (900–1100ms): Tiny rocking ±3° as shells land
-///   Phase 5 — Result   (1100ms+)   : Face reveal + count badge
+///   Phase 2 — Shake    (150–650ms) : Cupped-hands shake/vibrate
+///   Phase 3 — Scatter  (650–1050ms) : Shells fly out with bounceOut easing
+///   Phase 4 — Settle   (1050–1300ms): Tiny rocking ±3° as shells land
+///   Phase 5 — Result   (1300ms+)   : Face reveal + count badge
 ///
 /// Idle state: 4 shells in casual arrangement with gentle breathing animation.
 /// Tap on this component triggers a roll (replaces the old ROLL button).
@@ -61,14 +61,22 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
     _phase = _CowryPhase.gather;
     _notifiedAnimComplete = false;
 
-    // Pre-compute random scatter destinations inside throw zone
+    // Pre-compute random scatter destinations with guaranteed non-overlap
     final halfW = size.x * 0.42; // use ~84% of width
     final halfH = size.y * 0.30; // use ~60% of height
+    final shellW = (size.x * 0.14).clamp(40.0, 70.0);
+    final minDist = shellW * 1.1; // Minimum distance between shell centers
     for (int i = 0; i < 4; i++) {
-      _scatterTargets[i] = Offset(
-        -halfW + _rng.nextDouble() * halfW * 2, // Spread across zone width
-        -halfH + _rng.nextDouble() * halfH * 1.5, // Vertical variation
-      );
+      Offset candidate;
+      int attempts = 0;
+      do {
+        candidate = Offset(
+          -halfW + _rng.nextDouble() * halfW * 2,
+          -halfH + _rng.nextDouble() * halfH * 1.5,
+        );
+        attempts++;
+      } while (attempts < 50 && _hasOverlap(candidate, i, minDist));
+      _scatterTargets[i] = candidate;
       _scatterAngles[i] = (_rng.nextDouble() - 0.5) * 0.6; // ±0.3 rad
       _shells[i].phase = 0;
       _shells[i].settled = false;
@@ -76,6 +84,14 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
 
     // Randomise land stagger order
     _landDelays.shuffle(_rng);
+  }
+
+  /// Returns true if [candidate] is too close to any already-placed shell.
+  bool _hasOverlap(Offset candidate, int currentIndex, double minDist) {
+    for (int j = 0; j < currentIndex; j++) {
+      if ((candidate - _scatterTargets[j]).distance < minDist) return true;
+    }
+    return false;
   }
 
   // Shell idle positions — scaled dynamically in _getIdlePosition()
@@ -105,21 +121,21 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
         break;
 
       case _CowryPhase.shake:
-        if (_animTime > 0.40) {
+        if (_animTime > 0.50) {
           _phase = _CowryPhase.scatter;
           _animTime = 0;
         }
         break;
 
       case _CowryPhase.scatter:
-        if (_animTime > 0.35) {
+        if (_animTime > 0.40) {
           _phase = _CowryPhase.settle;
           _animTime = 0;
         }
         break;
 
       case _CowryPhase.settle:
-        if (_animTime > 0.20) {
+        if (_animTime > 0.25) {
           _phase = _CowryPhase.result;
           _animTime = 0;
           // Fire animation complete callback
@@ -326,14 +342,14 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
 
       case _CowryPhase.scatter:
         // Fly out to random positions with bounceOut
-        final rawT = (_animTime / 0.35 - _landDelays[index]).clamp(0.0, 1.0);
+        final rawT = (_animTime / 0.40 - _landDelays[index]).clamp(0.0, 1.0);
         final t = _bounceOut(rawT);
         return Offset.lerp(Offset.zero, _scatterTargets[index], t)!;
 
       case _CowryPhase.settle:
         // Stay at scatter target with tiny rocking
         final rockPhase = _animTime * 30 + index * 2;
-        final rockAmount = (1.0 - (_animTime / 0.20).clamp(0.0, 1.0)) * 2;
+        final rockAmount = (1.0 - (_animTime / 0.25).clamp(0.0, 1.0)) * 2;
         return _scatterTargets[index] +
             Offset(
               sin(rockPhase) * rockAmount,
@@ -354,7 +370,7 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
       case _CowryPhase.shake:
         return 0.7;
       case _CowryPhase.scatter:
-        final rawT = (_animTime / 0.35 - _landDelays[index]).clamp(0.0, 1.0);
+        final rawT = (_animTime / 0.40 - _landDelays[index]).clamp(0.0, 1.0);
         return 0.7 + rawT * 0.3; // Scale back to 1.0
       case _CowryPhase.settle:
       case _CowryPhase.result:
@@ -371,11 +387,11 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
       case _CowryPhase.shake:
         return sin(_animTime * 40 + index * 1.7) * 0.15;
       case _CowryPhase.scatter:
-        final rawT = (_animTime / 0.35 - _landDelays[index]).clamp(0.0, 1.0);
+        final rawT = (_animTime / 0.40 - _landDelays[index]).clamp(0.0, 1.0);
         return _scatterAngles[index] * rawT;
       case _CowryPhase.settle:
         // Rocking settle ±3° → 0
-        final decay = 1.0 - (_animTime / 0.20).clamp(0.0, 1.0);
+        final decay = 1.0 - (_animTime / 0.25).clamp(0.0, 1.0);
         return sin(_animTime * 30 + index * 2) * 0.05 * decay +
             _scatterAngles[index];
       case _CowryPhase.result:

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// ============================================================
-/// ISTO Design Tokens — "Terracotta Dusk" & "Ivory Noon"
+/// ISTO Design Tokens — "Slate & Persimmon" & "Ivory Slate"
 /// ============================================================
 /// Single source of truth for all design values.
 /// Based on the ISTO Game UI/UX Design Guidelines v1.0.
@@ -12,55 +12,55 @@ import 'package:flutter/material.dart';
 // COLOR SYSTEM
 // ──────────────────────────────────────────────
 
-/// Dark theme — "Terracotta Dusk" (Default)
+/// Dark theme — "Slate & Persimmon" (Default)
 class IstoColorsDark {
   IstoColorsDark._();
 
-  // Backgrounds
-  static const Color bgPrimary = Color(0xFF1A1209);
-  static const Color bgSurface = Color(0xFF2B1E0F);
-  static const Color bgElevated = Color(0xFF3D2A14);
+  // Backgrounds — Deep Ink base
+  static const Color bgPrimary = Color(0xFF101014);
+  static const Color bgSurface = Color(0xFF1A1A1E);
+  static const Color bgElevated = Color(0xFF252528);
 
-  // Board
-  static const Color boardCell = Color(0xFF4A3320);
-  static const Color boardCellAlt = Color(0xFF3C2A18);
-  static const Color boardLine = Color(0xFF6B4C2A);
-  static const Color boardOuterBorder = Color(0xFF8A6035);
+  // Board — Slate tones
+  static const Color boardCell = Color(0xFF2E2E32);
+  static const Color boardCellAlt = Color(0xFF262629);
+  static const Color boardLine = Color(0xFF4A4A4E);
+  static const Color boardOuterBorder = Color(0xFF5A5A5E);
 
-  // Accents
-  static const Color accentPrimary = Color(0xFFE8A44A);
-  static const Color accentWarm = Color(0xFFD4763A);
-  static const Color accentGlow = Color(0xFFFFD98A);
+  // Accents — Persimmon
+  static const Color accentPrimary = Color(0xFFFF5733);
+  static const Color accentWarm = Color(0xFFFF7043);
+  static const Color accentGlow = Color(0xFFFF8A65);
 
-  // Text
-  static const Color textPrimary = Color(0xFFF5E6C8);
-  static const Color textSecondary = Color(0xFFA8865A);
-  static const Color textMuted = Color(0xFF6B5240);
+  // Text — Arctic White
+  static const Color textPrimary = Color(0xFFF9F9F9);
+  static const Color textSecondary = Color(0xFFA0A0A4);
+  static const Color textMuted = Color(0xFF6B6B6F);
 
   // Semantic
-  static const Color success = Color(0xFF4CAF73);
+  static const Color success = Color(0xFF00A86B);
   static const Color danger = Color(0xFFE05252);
 
-  // Safe squares
-  static const Color safeSquare = Color(0xFF2D5A3D);
-  static const Color safeSquareBorder = Color(0xFF4CAF73);
+  // Safe squares — Jade Green
+  static const Color safeSquare = Color(0xFF1A4D3A);
+  static const Color safeSquareBorder = Color(0xFF00A86B);
 
   // Center / Home
-  static const Color centerHome = Color(0xFF3A1A05);
-  static const Color centerHomeGlow = Color(0xFFFFD98A);
+  static const Color centerHome = Color(0xFF1A1014);
+  static const Color centerHomeGlow = Color(0xFFFF8A65);
 }
 
-/// Light theme — "Ivory Noon" (Optional)
+/// Light theme — "Ivory Slate" (Optional)
 class IstoColorsLight {
   IstoColorsLight._();
 
-  static const Color bgPrimary = Color(0xFFFDF6EC);
-  static const Color bgSurface = Color(0xFFF0DFC0);
-  static const Color boardCell = Color(0xFFE8CFA0);
-  static const Color boardCellAlt = Color(0xFFD6BB8A);
-  static const Color accentPrimary = Color(0xFFA0530A);
-  static const Color textPrimary = Color(0xFF2A1A08);
-  static const Color boardLine = Color(0xFFB89060);
+  static const Color bgPrimary = Color(0xFFF5F5F7);
+  static const Color bgSurface = Color(0xFFE8E8EC);
+  static const Color boardCell = Color(0xFFD0D0D5);
+  static const Color boardCellAlt = Color(0xFFC0C0C5);
+  static const Color accentPrimary = Color(0xFFE04520);
+  static const Color textPrimary = Color(0xFF101014);
+  static const Color boardLine = Color(0xFF8A8A8E);
 }
 
 // ──────────────────────────────────────────────
@@ -72,7 +72,7 @@ class IstoPlayerColorSet {
   final Color glow;
   final Color shadow;
   final Color muted;
-  final String symbol; // ▲ ○ ◆ +
+  final String symbol; // Empty — clean modern look
 
   const IstoPlayerColorSet({
     required this.base,
@@ -87,41 +87,41 @@ class IstoPlayerColors {
   IstoPlayerColors._();
 
   static const List<IstoPlayerColorSet> _players = [
-    // Player 1 — Crimson
+    // Player 1 — Persimmon
     IstoPlayerColorSet(
-      base: Color(0xFFC0392B),
-      glow: Color(0xFFE85444),
-      shadow: Color(0xFF7A2319),
-      muted: Color(0xFF6B3A35),
-      symbol: '▲',
+      base: Color(0xFFFF5733),
+      glow: Color(0xFFFF8A65),
+      shadow: Color(0xFF992E1A),
+      muted: Color(0xFF6B4040),
+      symbol: '',
     ),
-    // Player 2 — Cobalt
+    // Player 2 — Jade
     IstoPlayerColorSet(
-      base: Color(0xFF1B4F9C),
-      glow: Color(0xFF3A73D4),
-      shadow: Color(0xFF0E2F5E),
+      base: Color(0xFF00A86B),
+      glow: Color(0xFF33CC8E),
+      shadow: Color(0xFF006440),
+      muted: Color(0xFF3A5A4A),
+      symbol: '',
+    ),
+    // Player 3 — Steel Blue
+    IstoPlayerColorSet(
+      base: Color(0xFF4A90D9),
+      glow: Color(0xFF7AB3EE),
+      shadow: Color(0xFF2A5580),
       muted: Color(0xFF3A4A5E),
-      symbol: '○',
+      symbol: '',
     ),
-    // Player 3 — Forest
+    // Player 4 — Amber
     IstoPlayerColorSet(
-      base: Color(0xFF2E7D4F),
-      glow: Color(0xFF4DB377),
-      shadow: Color(0xFF1A4A2E),
-      muted: Color(0xFF3A5A45),
-      symbol: '◆',
-    ),
-    // Player 4 — Saffron
-    IstoPlayerColorSet(
-      base: Color(0xFFC07A00),
-      glow: Color(0xFFF0A820),
-      shadow: Color(0xFF704800),
+      base: Color(0xFFE8A44A),
+      glow: Color(0xFFF0C870),
+      shadow: Color(0xFF8A6020),
       muted: Color(0xFF6B5A30),
-      symbol: '+',
+      symbol: '',
     ),
   ];
 
-  static const List<String> names = ['Crimson', 'Cobalt', 'Forest', 'Saffron'];
+  static const List<String> names = ['Persimmon', 'Jade', 'Steel', 'Amber'];
 
   /// Get full color set for a player by index (0–3)
   static IstoPlayerColorSet of(int playerIndex) {
@@ -361,7 +361,7 @@ class IstoGradients {
   static const LinearGradient bgDark = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [IstoColorsDark.bgPrimary, Color(0xFF130E06), Color(0xFF0D0904)],
+    colors: [IstoColorsDark.bgPrimary, Color(0xFF0C0C0F), Color(0xFF080810)],
   );
 
   static const LinearGradient accentGold = LinearGradient(
@@ -370,7 +370,7 @@ class IstoGradients {
     colors: [
       IstoColorsDark.accentGlow,
       IstoColorsDark.accentPrimary,
-      Color(0xFFB8862A),
+      Color(0xFFCC4425),
     ],
   );
 
@@ -388,12 +388,12 @@ class IstoGradients {
 class IstoDecorations {
   IstoDecorations._();
 
-  /// Primary CTA button (filled gold)
+  /// Primary CTA button (filled persimmon)
   static BoxDecoration primaryButton({bool pressed = false}) => BoxDecoration(
     gradient:
         pressed
             ? const LinearGradient(
-              colors: [Color(0xFFA07830), Color(0xFFC89040)],
+              colors: [Color(0xFFCC4425), Color(0xFFFF5733)],
             )
             : IstoGradients.accentGold,
     borderRadius: BorderRadius.circular(IstoRadius.md),

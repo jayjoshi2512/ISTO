@@ -8,7 +8,7 @@ import '../game/isto_game.dart';
 import '../theme/isto_tokens.dart';
 
 /// Gold gradient roll button with breathing pulse and press feedback.
-/// Terracotta Dusk styled — warm gold gradient, mini cowry shell icons.
+/// Slate & Persimmon styled — persimmon gradient, mini cowry shell icons.
 class RollButtonOverlay extends StatefulWidget {
   final ISTOGame game;
 

@@ -8,7 +8,7 @@ import '../models/models.dart';
 import '../theme/isto_tokens.dart';
 
 /// Dialog for choosing how many stacked pawns to move together.
-/// Terracotta Dusk palette, GoogleFonts Poppins.
+/// Slate & Persimmon palette, GoogleFonts Poppins.
 class StackedPawnDialog extends StatefulWidget {
   final ISTOGame game;
   final List<Pawn> stackedPawns;

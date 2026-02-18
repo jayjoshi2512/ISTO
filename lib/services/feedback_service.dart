@@ -61,94 +61,83 @@ class FeedbackService {
   }
 
   // === Game Event Feedback ===
+  // Sound fires FIRST (instant), then haptic (non-blocking).
+  // All methods are fire-and-forget — no async chains that delay sound.
 
-  /// Called when cowries are rolled
-  Future<void> onRoll() async {
-    await mediumTap();
-    await _audio.playRollSound();
+  /// Cowry roll sound
+  void onRoll() {
+    _audio.playRollSound();
+    mediumTap();
   }
 
-  /// Called when rolling CHOWKA (4) or ASHTA (8) - GRACE THROW CELEBRATION
-  Future<void> onGraceThrow() async {
-    await heavyTap();
-    await _audio.playGraceThrow();
-    // Triple-tap for emphasis on this celebratory moment
-    await Future.delayed(const Duration(milliseconds: 80));
-    await mediumTap();
-    await Future.delayed(const Duration(milliseconds: 80));
-    await mediumTap();
+  /// CHOWKA (4) / ASHTA (8) grace throw
+  void onGraceThrow() {
+    _audio.playGraceThrow();
+    heavyTap();
   }
 
-  /// Called when a pawn is selected
-  Future<void> onPawnSelect() async {
-    await lightTap();
-    await _audio.playPawnSelect();
+  /// Pawn selected
+  void onPawnSelect() {
+    _audio.playPawnSelect();
+    lightTap();
   }
 
-  /// Called when a pawn moves
-  Future<void> onPawnMove() async {
-    await selectionClick();
-    await _audio.playPawnMove();
+  /// Pawn hop sound (called per hop by animation)
+  void onPawnMove() {
+    _audio.playPawnMove();
+    selectionClick();
   }
 
-  /// Called when a pawn enters the board
-  Future<void> onPawnEnter() async {
-    await mediumTap();
-    await _audio.playPawnEnter();
+  /// Pawn enters the board from home
+  void onPawnEnter() {
+    _audio.playPawnEnter();
+    mediumTap();
   }
 
-  /// Called when an opponent pawn is captured - DRAMATIC
-  Future<void> onCapture() async {
-    await heavyTap();
-    await _audio.playCapture();
-    await Future.delayed(const Duration(milliseconds: 80));
-    await heavyTap();
+  /// Opponent captured
+  void onCapture() {
+    _audio.playCapture();
+    heavyTap();
   }
 
-  /// Called when a pawn reaches HOME (center)
-  Future<void> onPawnFinish() async {
-    await heavyTap();
-    await _audio.playPawnFinish();
-    await Future.delayed(const Duration(milliseconds: 100));
-    await mediumTap();
-    await Future.delayed(const Duration(milliseconds: 100));
-    await lightTap();
+  /// Pawn reaches a safe square
+  void onSafeHome() {
+    _audio.playSafeHome();
+    mediumTap();
   }
 
-  /// Called when player wins
-  Future<void> onWin() async {
-    await _audio.playWin();
-    for (int i = 0; i < 3; i++) {
-      await heavyTap();
-      await Future.delayed(const Duration(milliseconds: 150));
-    }
+  /// Pawn reaches center (finished)
+  void onPawnFinish() {
+    _audio.playPawnFinish();
+    heavyTap();
   }
 
-  /// Called when turn changes to this player
-  Future<void> onTurnStart() async {
-    await selectionClick();
-    await _audio.playTurnChange();
+  /// Player wins the game
+  void onWin() {
+    _audio.playWin();
+    heavyTap();
   }
 
-  /// Called when extra turn is granted - CELEBRATORY
-  Future<void> onExtraTurn() async {
-    await mediumTap();
-    await _audio.playExtraTurn();
-    // Two taps to celebrate getting another turn
-    await Future.delayed(const Duration(milliseconds: 50));
-    await mediumTap();
+  /// Turn changes (haptic only — no jarring sound every turn)
+  void onTurnStart() {
+    selectionClick();
   }
 
-  /// Called on invalid move attempt
-  Future<void> onInvalidMove() async {
-    await vibrate();
-    await _audio.playError();
+  /// Extra turn granted (haptic only — grace throw sound already played)
+  void onExtraTurn() {
+    mediumTap();
   }
 
-  /// Called when no valid moves available
-  Future<void> onNoMoves() async {
-    await lightTap();
-    await _audio.playBlocked();
+  /// Invalid move attempt
+  void onInvalidMove() {
+    _audio.playError();
+    vibrate();
+  }
+
+  /// No valid moves available
+  void onNoMoves() {
+    _audio.playBlocked();
+    lightTap();
   }
 }
 

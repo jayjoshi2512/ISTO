@@ -34,9 +34,25 @@ class AIController {
       case AIDifficulty.easy:
         return _selectEasy(validPawns);
       case AIDifficulty.medium:
-        return _selectMedium(validPawns, steps, roll, boardController, allPawns, playerId, hasCaptured);
+        return _selectMedium(
+          validPawns,
+          steps,
+          roll,
+          boardController,
+          allPawns,
+          playerId,
+          hasCaptured,
+        );
       case AIDifficulty.hard:
-        return _selectHard(validPawns, steps, roll, boardController, allPawns, playerId, hasCaptured);
+        return _selectHard(
+          validPawns,
+          steps,
+          roll,
+          boardController,
+          allPawns,
+          playerId,
+          hasCaptured,
+        );
     }
   }
 
@@ -58,7 +74,15 @@ class AIController {
     if (_random.nextDouble() < 0.3) {
       return _selectEasy(validPawns);
     }
-    return _selectBest(validPawns, steps, roll, boardController, allPawns, playerId, hasCaptured);
+    return _selectBest(
+      validPawns,
+      steps,
+      roll,
+      boardController,
+      allPawns,
+      playerId,
+      hasCaptured,
+    );
   }
 
   /// Hard: Always pick best move with full evaluation
@@ -71,7 +95,15 @@ class AIController {
     int playerId,
     bool hasCaptured,
   ) {
-    return _selectBest(validPawns, steps, roll, boardController, allPawns, playerId, hasCaptured);
+    return _selectBest(
+      validPawns,
+      steps,
+      roll,
+      boardController,
+      allPawns,
+      playerId,
+      hasCaptured,
+    );
   }
 
   /// Select the best move using scoring heuristics
@@ -88,7 +120,15 @@ class AIController {
     Pawn bestPawn = validPawns.first;
 
     for (final pawn in validPawns) {
-      final score = _evaluateMove(pawn, steps, roll, boardController, allPawns, playerId, hasCaptured);
+      final score = _evaluateMove(
+        pawn,
+        steps,
+        roll,
+        boardController,
+        allPawns,
+        playerId,
+        hasCaptured,
+      );
       if (score > bestScore) {
         bestScore = score;
         bestPawn = pawn;
@@ -136,20 +176,28 @@ class AIController {
     score += _evaluateKill(destPos, boardController, allPawns, playerId);
 
     // === SAFETY EVALUATION ===
-    score += _evaluateSafety(pawn, destPos, boardController, allPawns, playerId);
+    score += _evaluateSafety(
+      pawn,
+      destPos,
+      boardController,
+      allPawns,
+      playerId,
+    );
 
     // === PROGRESS EVALUATION ===
     score += _evaluateProgress(pawn, newIndex, path.length);
 
     // === INNER RING ENTRY ===
-    if (BoardConfig.isInnerPath(destPos) && !BoardConfig.isInnerPath(path[pawn.pathIndex])) {
+    if (BoardConfig.isInnerPath(destPos) &&
+        !BoardConfig.isInnerPath(path[pawn.pathIndex])) {
       if (hasCaptured) {
         score += 60; // Good to enter inner ring if eligible
       }
     }
 
     // === LEAVING SAFE SQUARE PENALTY ===
-    if (BoardConfig.isSafeSquare(path[pawn.pathIndex]) && !BoardConfig.isSafeSquare(destPos)) {
+    if (BoardConfig.isSafeSquare(path[pawn.pathIndex]) &&
+        !BoardConfig.isSafeSquare(destPos)) {
       score -= 40; // Slight penalty for leaving safety
     }
 
@@ -166,7 +214,8 @@ class AIController {
     double score = 120; // Base entry value
 
     // Count active pawns - prefer entering when we have few on board
-    final activePawns = allPawns.where((p) => p.playerId == playerId && p.isActive).length;
+    final activePawns =
+        allPawns.where((p) => p.playerId == playerId && p.isActive).length;
     if (activePawns == 0) {
       score += 80; // Must enter if no pawns on board
     } else if (activePawns < 2) {
@@ -229,7 +278,12 @@ class AIController {
       score += 80;
     } else {
       // Check if any opponent can reach this square
-      final dangerLevel = _assessDanger(destPos, boardController, allPawns, playerId);
+      final dangerLevel = _assessDanger(
+        destPos,
+        boardController,
+        allPawns,
+        playerId,
+      );
       score -= dangerLevel * 30;
     }
 
@@ -255,7 +309,9 @@ class AIController {
     double danger = 0;
 
     // Check each opponent pawn
-    for (final opponent in allPawns.where((p) => p.playerId != playerId && p.isActive)) {
+    for (final opponent in allPawns.where(
+      (p) => p.playerId != playerId && p.isActive,
+    )) {
       final opponentPath = boardController.playerPaths[opponent.playerId]!;
 
       // Check if opponent is within striking distance (1-8 steps)
@@ -284,12 +340,18 @@ class AIController {
     // 3 up (3 steps): 4/16 = 0.25
     // 4 up (4 steps): 1/16 = 0.0625
     switch (steps) {
-      case 1: return 0.25;
-      case 2: return 0.375;
-      case 3: return 0.25;
-      case 4: return 0.0625;
-      case 8: return 0.0625;
-      default: return 0;
+      case 1:
+        return 0.25;
+      case 2:
+        return 0.375;
+      case 3:
+        return 0.25;
+      case 4:
+        return 0.0625;
+      case 8:
+        return 0.0625;
+      default:
+        return 0;
     }
   }
 
@@ -349,15 +411,15 @@ class AIController {
   }
 
   /// Get delay before AI makes a move (in milliseconds)
-  /// Varies by difficulty to feel more natural
+  /// Generous delays so the AI looks like it's thinking
   int getMoveDelay() {
     switch (difficulty) {
       case AIDifficulty.easy:
-        return 600 + _random.nextInt(800);
+        return 1200 + _random.nextInt(1000);
       case AIDifficulty.medium:
-        return 400 + _random.nextInt(600);
+        return 900 + _random.nextInt(800);
       case AIDifficulty.hard:
-        return 300 + _random.nextInt(400);
+        return 700 + _random.nextInt(600);
     }
   }
 
@@ -365,11 +427,11 @@ class AIController {
   int getRollDelay() {
     switch (difficulty) {
       case AIDifficulty.easy:
-        return 800 + _random.nextInt(1000);
+        return 1500 + _random.nextInt(1200);
       case AIDifficulty.medium:
-        return 500 + _random.nextInt(700);
+        return 1200 + _random.nextInt(1000);
       case AIDifficulty.hard:
-        return 300 + _random.nextInt(500);
+        return 800 + _random.nextInt(800);
     }
   }
 }

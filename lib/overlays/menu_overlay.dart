@@ -10,7 +10,7 @@ import '../components/animated_background.dart';
 import 'how_to_play_overlay.dart';
 
 /// Home / Menu screen — clean vertical stack, board-centric.
-/// Terracotta Dusk palette, GoogleFonts Poppins + Lora.
+/// Slate & Persimmon palette, GoogleFonts Poppins + Lora.
 class MenuOverlay extends StatefulWidget {
   final ISTOGame game;
 

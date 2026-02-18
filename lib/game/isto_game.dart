@@ -35,6 +35,33 @@ class ISTOGame extends FlameGame with TapCallbacks {
   Pawn? _pendingStackedPawn;
   List<Pawn>? _pendingStackedPawns;
 
+  // ========== EVENT QUEUE ==========
+  // Serializes game events so the next one only fires after the previous
+  // animation/sound finishes. Prevents overlapping sounds & mixed animations.
+  final List<_GameEvent> _eventQueue = [];
+  bool _eventRunning = false;
+
+  void _enqueue(_GameEvent event) {
+    _eventQueue.add(event);
+    _drainQueue();
+  }
+
+  void _drainQueue() {
+    if (_eventRunning || _eventQueue.isEmpty) return;
+    _eventRunning = true;
+    final event = _eventQueue.removeAt(0);
+    event.run(() {
+      _eventRunning = false;
+      _drainQueue();
+    });
+  }
+
+  /// Flush the queue (e.g. when starting a new game)
+  void _clearEventQueue() {
+    _eventQueue.clear();
+    _eventRunning = false;
+  }
+
   ISTOGame() {
     gameManager = GameManager();
   }
@@ -140,11 +167,6 @@ class ISTOGame extends FlameGame with TapCallbacks {
     pawnSize = squareSize * 0.5;
   }
 
-  /// Called when cowry roll animation finishes — now show highlights
-  void _onCowryAnimationDone() {
-    gameManager.onCowryAnimationComplete();
-  }
-
   void _setupCallbacks() {
     gameManager.onStateChanged = _onGameStateChanged;
     gameManager.onRollComplete = _onRollComplete;
@@ -216,14 +238,37 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
   void _onGameStateChanged() {
     boardComponent.updateDisplay();
-    // No roll button needed — cowry zone handles tap
   }
 
   void _onRollComplete(CowryRoll roll) {
-    cowryDisplayComponent.showRoll(roll);
-    if (roll.grantsExtraTurn) {
-      _feedback.onGraceThrow();
-    }
+    _enqueue(
+      _GameEvent(
+        name: 'roll',
+        run: (done) {
+          cowryDisplayComponent.showRoll(roll);
+          // Sound fires at animation start
+          if (roll.grantsExtraTurn) {
+            _feedback.onGraceThrow();
+          } else {
+            _feedback.onRoll();
+          }
+          // Cowry animation is ~1.3s. onCowryAnimationDone fires when it ends.
+          // The queue event completes when cowry animation callback fires.
+          _pendingRollDone = done;
+        },
+      ),
+    );
+  }
+
+  VoidCallback? _pendingRollDone;
+
+  /// Called when cowry roll animation finishes — now show highlights
+  void _onCowryAnimationDone() {
+    gameManager.onCowryAnimationComplete();
+    // Complete the queued roll event
+    final done = _pendingRollDone;
+    _pendingRollDone = null;
+    done?.call();
   }
 
   void _onMoveComplete(Pawn pawn, MoveResult result) {
@@ -234,34 +279,92 @@ class ISTOGame extends FlameGame with TapCallbacks {
       if (!result.wasEntry &&
           result.fromPathIndex != null &&
           result.toPathIndex != null) {
-        boardComponent.animatePawnMove(
-          pawn,
-          result.fromPathIndex!,
-          result.toPathIndex!,
+        final fromIdx = result.fromPathIndex!;
+        final toIdx = result.toPathIndex!;
+        final hopCount = (toIdx - fromIdx).abs();
+        // Estimate hop animation duration: hops * hopDuration + landing buffer
+        final hopMs = hopCount <= 2 ? 360 : (hopCount <= 4 ? 315 : 265);
+        final totalMs = hopCount * hopMs + 200; // +200ms landing settle
+
+        _enqueue(
+          _GameEvent(
+            name: 'pawnMove',
+            run: (done) {
+              boardComponent.animatePawnMove(pawn, fromIdx, toIdx);
+              // Complete after animation duration
+              Future.delayed(Duration(milliseconds: totalMs), done);
+            },
+          ),
+        );
+      } else if (result.wasEntry) {
+        _enqueue(
+          _GameEvent(
+            name: 'pawnEnter',
+            run: (done) {
+              _feedback.onPawnEnter();
+              Future.delayed(const Duration(milliseconds: 450), done);
+            },
+          ),
         );
       }
     }
 
-    _feedback.onPawnMove();
-
     if (result.killedOpponent) {
-      overlays.add('capture');
-      _feedback.onCapture();
-      for (final victim in result.victims) {
-        boardComponent.animatePawnSentHome(victim);
-      }
+      _enqueue(
+        _GameEvent(
+          name: 'capture',
+          run: (done) {
+            overlays.add('capture');
+            _feedback.onCapture();
+            for (final victim in result.victims) {
+              final idx = result.victimPathIndices[victim.id] ?? 0;
+              boardComponent.animatePawnSentHome(victim, idx);
+            }
+            // Poll until all retreat animations finish, then proceed
+            void waitForRetreats() {
+              if (boardComponent.hasActiveRetreatAnims) {
+                Future.delayed(
+                  const Duration(milliseconds: 80),
+                  waitForRetreats,
+                );
+              } else {
+                Future.delayed(const Duration(milliseconds: 300), done);
+              }
+            }
+
+            // Give a small initial delay for the overlay to show
+            Future.delayed(const Duration(milliseconds: 200), waitForRetreats);
+          },
+        ),
+      );
     }
 
     if (result.reachedCenter) {
-      _feedback.onPawnFinish();
+      _enqueue(
+        _GameEvent(
+          name: 'reachCenter',
+          run: (done) {
+            _feedback.onPawnFinish();
+            Future.delayed(const Duration(milliseconds: 1400), done);
+          },
+        ),
+      );
     }
   }
 
   void _onPlayerFinished(int playerId) {}
 
   void _onGameOver(int winnerId) {
-    overlays.add(winOverlay);
-    _feedback.onWin();
+    _enqueue(
+      _GameEvent(
+        name: 'gameOver',
+        run: (done) {
+          overlays.add(winOverlay);
+          _feedback.onWin();
+          // Don't call done — game is over, queue should stop
+        },
+      ),
+    );
   }
 
   void _onValidMovesCalculated(List<Pawn> validPawns) {
@@ -284,24 +387,32 @@ class ISTOGame extends FlameGame with TapCallbacks {
   }
 
   void _onExtraTurn() {
-    // Delay extra turn toast if capture toast is already showing,
-    // so they appear sequentially instead of simultaneously
-    final delay =
-        overlays.isActive('capture')
-            ? const Duration(milliseconds: 600)
-            : Duration.zero;
-    Future.delayed(delay, () {
-      if (!isLoaded) return;
-      overlays.add('extraTurn');
-      _feedback.onExtraTurn();
-    });
+    _enqueue(
+      _GameEvent(
+        name: 'extraTurn',
+        run: (done) {
+          overlays.add('extraTurn');
+          _feedback.onExtraTurn();
+          Future.delayed(const Duration(milliseconds: 1200), done);
+        },
+      ),
+    );
   }
 
   void _onNoValidMoves() {
-    overlays.add('noMoves');
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      overlays.remove('noMoves');
-    });
+    _enqueue(
+      _GameEvent(
+        name: 'noMoves',
+        run: (done) {
+          _feedback.onNoMoves();
+          overlays.add('noMoves');
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            overlays.remove('noMoves');
+            done();
+          });
+        },
+      ),
+    );
   }
 
   // ========== PAWN INTERACTION ==========
@@ -334,6 +445,7 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
   /// Start a new game with config
   void startNewGame(int playerCount, {GameConfig? config}) {
+    _clearEventQueue();
     overlays.remove(winOverlay);
     overlays.remove(menuOverlay);
     highlightedPawns.clear();
@@ -346,4 +458,13 @@ class ISTOGame extends FlameGame with TapCallbacks {
   void showMenu() {
     overlays.add(menuOverlay);
   }
+}
+
+// =============================================================================
+// Event queue item — wraps a game event with a completion callback.
+// =============================================================================
+class _GameEvent {
+  final String name;
+  final void Function(VoidCallback done) run;
+  _GameEvent({required this.name, required this.run});
 }

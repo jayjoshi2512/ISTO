@@ -4,7 +4,7 @@ import '../theme/isto_tokens.dart';
 import 'player_colors.dart';
 
 /// Theme configuration — colors, sizes, and player theming
-/// All colors derived from IstoColorsDark (Terracotta Dusk) tokens.
+/// All colors derived from IstoColorsDark (Slate & Persimmon) tokens.
 class ThemeConfig {
   // ======= BOARD COLORS =======
   static const Color boardBackground = IstoColorsDark.bgSurface;
@@ -18,16 +18,16 @@ class ThemeConfig {
   static const Color safeSquareMark = IstoColorsDark.safeSquareBorder;
 
   // ======= COWRY COLORS =======
-  static const Color cowryUp = Color(0xFFF5F0E0); // Ivory mouth-up
-  static const Color cowryDown = Color(0xFFA08060); // Brown shell back
-  static const Color cowryBorder = Color(0xFF5A4830); // Shell edge
+  static const Color cowryUp = Color(0xFFF9F9F9); // Arctic White mouth-up
+  static const Color cowryDown = Color(0xFF5A5A5E); // Slate shell back
+  static const Color cowryBorder = Color(0xFF3B3B3D); // Slate Grey edge
 
   // ======= UI COLORS =======
   static const Color textPrimary = IstoColorsDark.textPrimary;
   static const Color textSecondary = IstoColorsDark.textSecondary;
   static const Color textMuted = IstoColorsDark.textMuted;
   static const Color goldAccent = IstoColorsDark.accentPrimary;
-  static const Color goldDark = Color(0xFF8A6020);
+  static const Color goldDark = Color(0xFFCC4425);
   static const Color dangerRed = IstoColorsDark.danger;
   static const Color successGreen = IstoColorsDark.success;
 

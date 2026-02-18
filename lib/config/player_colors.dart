@@ -3,27 +3,27 @@ import 'dart:ui';
 import '../theme/isto_tokens.dart';
 
 /// UNIFIED Player Colors - Single Source of Truth
-/// Heritage tones from ISTO design spec: Crimson, Cobalt, Forest, Saffron
+/// Slate & Persimmon palette: Persimmon, Jade, Steel Blue, Amber
 class PlayerColors {
   // ============ PLAYER COLORS (Consistent across all UI) ============
 
-  /// Player 0 - Crimson (heritage red)
-  static const Color player0 = Color(0xFFC0392B);
+  /// Player 0 - Persimmon (primary accent)
+  static const Color player0 = Color(0xFFFF5733);
 
-  /// Player 1 - Cobalt (deep blue)
-  static const Color player1 = Color(0xFF1B4F9C);
+  /// Player 1 - Jade Green (supporting accent)
+  static const Color player1 = Color(0xFF00A86B);
 
-  /// Player 2 - Forest (heritage green)
-  static const Color player2 = Color(0xFF2E7D4F);
+  /// Player 2 - Steel Blue (cool contrast)
+  static const Color player2 = Color(0xFF4A90D9);
 
-  /// Player 3 - Saffron (warm gold-orange)
-  static const Color player3 = Color(0xFFC07A00);
+  /// Player 3 - Amber (warm gold)
+  static const Color player3 = Color(0xFFE8A44A);
 
   /// List of all player colors for indexed access
   static const List<Color> colors = [player0, player1, player2, player3];
 
   /// Player names corresponding to colors
-  static const List<String> names = ['Crimson', 'Cobalt', 'Forest', 'Saffron'];
+  static const List<String> names = ['Persimmon', 'Jade', 'Steel', 'Amber'];
 
   /// Get color for player by ID (0-3)
   static Color getColor(int playerId) {

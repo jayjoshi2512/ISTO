@@ -53,9 +53,9 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
         color:
             [
               IstoColorsDark.accentPrimary,
-              IstoPlayerColors.base(0), // Crimson
-              IstoPlayerColors.base(1), // Cobalt
-              IstoPlayerColors.base(2), // Forest
+              IstoPlayerColors.base(0), // Persimmon
+              IstoPlayerColors.base(1), // Jade
+              IstoPlayerColors.base(2), // Steel
               IstoColorsDark.accentGlow,
               IstoColorsDark.accentWarm,
             ][rng.nextInt(6)],

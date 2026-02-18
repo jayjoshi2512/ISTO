@@ -11,6 +11,7 @@ import '../config/player_colors.dart';
 import '../config/theme_config.dart';
 import '../game/game_manager.dart';
 import '../models/models.dart';
+import '../services/audio_service.dart';
 import '../theme/isto_tokens.dart';
 
 /// Renders the entire game board — 5×5 grid, premium pawns, home areas,
@@ -27,8 +28,11 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   // Animation state
   double _animTime = 0;
 
-  // Pawn move animations
-  final Map<String, _PawnMoveAnim> _moveAnims = {};
+  // Pawn move animations — now supports multi-step hop-by-hop
+  final Map<String, _PawnHopChainAnim> _moveAnims = {};
+
+  // Retreat animations — killed pawns walking backwards to home
+  final Map<String, _PawnRetreatAnim> _retreatAnims = {};
 
   // Screen shake
   double _shakeIntensity = 0;
@@ -61,11 +65,16 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       if (_shakeIntensity < 0.3) _shakeIntensity = 0;
     }
 
-    // Update move animations
-    _moveAnims.removeWhere((_, a) => a.progress >= 1.0);
+    // Update move animations (hop-by-hop chain)
+    _moveAnims.removeWhere((_, a) => a.isComplete);
     for (final anim in _moveAnims.values) {
-      anim.progress += dt * 3.5;
-      if (anim.progress > 1.0) anim.progress = 1.0;
+      anim.update(dt);
+    }
+
+    // Update retreat animations (captured pawns going backwards)
+    _retreatAnims.removeWhere((_, a) => a.isComplete);
+    for (final anim in _retreatAnims.values) {
+      anim.update(dt);
     }
 
     // Update flash
@@ -95,6 +104,9 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     _drawPathGlow(canvas); // Full path glow rendered before pawns
     _drawHomeAreas(canvas);
     _drawPawns(canvas);
+    _drawRetreatPawns(
+      canvas,
+    ); // Captured pawns retreating home — on top of everything
     _drawCenterDecoration(canvas);
   }
 
@@ -957,7 +969,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
   // ========== PREMIUM PAWN RENDERING ==========
 
-  /// Draw a premium pawn disc with radial gradient, inner ring, and player symbol
+  /// Draw a designed pawn disc — soft radial gradient, inner ring accent,
+  /// and subtle centre highlight. Refined but not overly 3D.
   void _drawPremiumPawn(
     Canvas canvas,
     double x,
@@ -966,97 +979,55 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     Color color, {
     int? playerId,
   }) {
-    // Drop shadow — multi-layer for depth (spec §7: BoxShadow 0,3 blur 8dp)
+    // Soft drop shadow for grounding
     canvas.drawCircle(
-      Offset(x + 1, y + 3),
-      radius + 1,
+      Offset(x, y + 1.5),
+      radius + 0.5,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.5)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        ..color = Colors.black.withValues(alpha: 0.30)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
 
-    // Base disc (slightly larger, darker) — spec: base layer
-    canvas.drawCircle(
-      Offset(x, y + 2),
-      radius * 1.05,
-      Paint()..color = _darken(color, 45),
-    );
-
-    // Main body with rich radial gradient (spec §7: lighter center ~15%)
+    // Soft radial gradient body — lighter centre fading to slightly
+    // darker edge. Gives depth without the harsh 3D look.
     final bodyGradient = ui.Gradient.radial(
-      Offset(x - radius * 0.3, y - radius * 0.3),
-      radius * 1.4,
+      Offset(x - radius * 0.2, y - radius * 0.2), // offset for light angle
+      radius * 1.2,
       [
-        _lighten(color, 55), // Bright highlight
-        _lighten(color, 25), // Light area
-        color, // Mid tone
-        _darken(color, 35), // Shadow edge
+        _lighten(color, 22), // warm highlight centre
+        color, // true colour mid-zone
+        _darken(color, 18), // subtle shadow rim
       ],
-      [0.0, 0.3, 0.6, 1.0],
+      [0.0, 0.55, 1.0],
     );
     canvas.drawCircle(Offset(x, y), radius, Paint()..shader = bodyGradient);
 
-    // Inner ring — "carved groove" (spec §7: 2dp stroke, lighter shade)
+    // Inner ring detail — subtle carved accent
     canvas.drawCircle(
       Offset(x, y),
-      radius * 0.72,
+      radius * 0.62,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.2)
+        ..color = Colors.white.withValues(alpha: 0.14)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 1.3,
     );
 
-    // Rim light — thin bright edge for 3D pop
+    // Outer border ring — clean edge definition
     canvas.drawCircle(
       Offset(x, y),
       radius,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.3)
+        ..color = Colors.white.withValues(alpha: 0.32)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
+        ..strokeWidth = 1.5,
     );
 
-    // Inner specular highlight (top-left crescent)
-    final highlightPath =
-        Path()..addOval(
-          Rect.fromCenter(
-            center: Offset(x - radius * 0.2, y - radius * 0.2),
-            width: radius * 0.7,
-            height: radius * 0.5,
-          ),
-        );
-    canvas.drawPath(
-      highlightPath,
-      Paint()..color = Colors.white.withValues(alpha: 0.25),
-    );
-
-    // Tiny bright specular dot (the "shine point")
+    // Small centre highlight dot — subtle sparkle
     canvas.drawCircle(
-      Offset(x - radius * 0.25, y - radius * 0.25),
-      radius * 0.1,
-      Paint()..color = Colors.white.withValues(alpha: 0.65),
+      Offset(x - radius * 0.13, y - radius * 0.13),
+      radius * 0.09,
+      Paint()..color = Colors.white.withValues(alpha: 0.40),
     );
-
-    // Player symbol (spec §7: ▲ ○ ◆ +  ~14sp white 0.8 opacity)
-    if (playerId != null) {
-      final symbol = IstoPlayerColors.symbol(playerId);
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: symbol,
-          style: TextStyle(
-            fontSize: radius * 0.8,
-            fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.8),
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(x - textPainter.width / 2, y - textPainter.height / 2),
-      );
-    }
   }
 
   // ========== BOARD PAWNS ==========
@@ -1076,7 +1047,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
           // Check for move animation
           if (_moveAnims.containsKey(pawn.id)) {
-            _drawAnimatedPawn(canvas, pawn, _moveAnims[pawn.id]!);
+            _drawHopChainPawn(canvas, pawn, _moveAnims[pawn.id]!);
           } else {
             final isHighlighted = _highlightedPawns.any((p) => p.id == pawn.id);
             final isFlashing = _flashPawnId == pawn.id;
@@ -1178,22 +1149,62 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     _drawPremiumPawn(canvas, x, y, radius, color, playerId: pawn.playerId);
   }
 
-  void _drawAnimatedPawn(Canvas canvas, Pawn pawn, _PawnMoveAnim anim) {
-    final t = _easeOutCubic(anim.progress.clamp(0.0, 1.0));
+  /// Draw a pawn that is hopping along a chain of cells
+  void _drawHopChainPawn(Canvas canvas, Pawn pawn, _PawnHopChainAnim anim) {
+    final pos = anim.getCurrentPosition(squareSize, _gap);
+    final hop = anim.getCurrentHop(squareSize);
+    _drawBoardPawn(canvas, pos.dx, pos.dy - hop, pawn, false, false);
+  }
 
-    // Interpolate position
-    final fromX = anim.fromCol * (squareSize + _gap) + squareSize / 2;
-    final fromY = anim.fromRow * (squareSize + _gap) + squareSize / 2;
-    final toX = anim.toCol * (squareSize + _gap) + squareSize / 2;
-    final toY = anim.toRow * (squareSize + _gap) + squareSize / 2;
+  /// Draw retreat-ing (captured) pawns — ghost-like, going backwards
+  void _drawRetreatPawns(Canvas canvas) {
+    for (final entry in _retreatAnims.entries) {
+      final anim = entry.value;
+      if (anim.isComplete) continue;
+      final pos = anim.getCurrentPosition(squareSize, _gap);
+      final hop = anim.getCurrentHop(squareSize);
+      final color = PlayerColors.getColor(anim.playerId);
+      final radius = pawnSize * 0.45;
+      // Fade out as retreat progresses
+      final alpha = (1.0 - anim.overallProgress * 0.6).clamp(0.3, 1.0);
 
-    final x = fromX + (toX - fromX) * t;
-    final y = fromY + (toY - fromY) * t;
+      canvas.save();
+      canvas.translate(pos.dx, pos.dy - hop);
 
-    // Hop arc effect
-    final hop = sin(t * pi) * squareSize * 0.35;
+      // Ghost shadow
+      canvas.drawCircle(
+        const Offset(0, 1.5),
+        radius + 0.5,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.15 * alpha)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
 
-    _drawBoardPawn(canvas, x, y - hop, pawn, false, false);
+      // Translucent body
+      final bodyGradient = ui.Gradient.radial(
+        Offset(-radius * 0.2, -radius * 0.2),
+        radius * 1.2,
+        [
+          _lighten(color, 22).withValues(alpha: alpha),
+          color.withValues(alpha: alpha),
+          _darken(color, 18).withValues(alpha: alpha),
+        ],
+        [0.0, 0.55, 1.0],
+      );
+      canvas.drawCircle(Offset.zero, radius, Paint()..shader = bodyGradient);
+
+      // Border
+      canvas.drawCircle(
+        Offset.zero,
+        radius,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.25 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+
+      canvas.restore();
+    }
   }
 
   void _drawMiniPawn(Canvas canvas, double x, double y, Pawn pawn) {
@@ -1222,12 +1233,15 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     // Safe squares = start positions: P0=Bottom, P1=Top, P2=Left, P3=Right
     final playerCount = gameManager.playerCount;
     if (r == 4 && c == 2) return 0; // P0 start — Bottom (always active)
-    if (r == 0 && c == 2)
+    if (r == 0 && c == 2) {
       return (playerCount >= 2) ? 1 : null; // P1 start — Top
-    if (r == 2 && c == 0)
+    }
+    if (r == 2 && c == 0) {
       return (playerCount >= 3) ? 2 : null; // P2 start — Left
-    if (r == 2 && c == 4)
+    }
+    if (r == 2 && c == 4) {
       return (playerCount >= 4) ? 3 : null; // P3 start — Right
+    }
     return null;
   }
 
@@ -1311,10 +1325,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       (color.g.toInt() - amount).clamp(0, 255),
       (color.b.toInt() - amount).clamp(0, 255),
     );
-  }
-
-  double _easeOutCubic(double t) {
-    return 1 - pow(1 - t, 3).toDouble();
   }
 
   // ========== TAP HANDLING ==========
@@ -1409,21 +1419,52 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   void animatePawnMove(Pawn pawn, int fromIndex, int toIndex) {
     final path = gameManager.boardController.playerPaths[pawn.playerId]!;
     if (fromIndex >= 0 && fromIndex < path.length && toIndex < path.length) {
-      final from = path[fromIndex];
-      final to = path[toIndex];
-      _moveAnims[pawn.id] = _PawnMoveAnim(
-        fromRow: from[0].toDouble(),
-        fromCol: from[1].toDouble(),
-        toRow: to[0].toDouble(),
-        toCol: to[1].toDouble(),
+      // Build list of all cells from source to destination for hop-by-hop
+      final List<List<int>> hopCells = [];
+      final start = fromIndex < toIndex ? fromIndex : toIndex;
+      final end = fromIndex < toIndex ? toIndex : fromIndex;
+      for (int i = start; i <= end; i++) {
+        if (i < path.length) {
+          hopCells.add(path[i]);
+        }
+      }
+      if (hopCells.length >= 2) {
+        _moveAnims[pawn.id] = _PawnHopChainAnim(
+          cells: hopCells,
+          onHopSound: () {
+            audioService.playPawnMove();
+          },
+        );
+      }
+    }
+  }
+
+  void animatePawnSentHome(Pawn victim, int victimPathIndex) {
+    _shakeIntensity = 8.0;
+    _shakeTime = 0;
+
+    // Build the reverse path — from the kill cell back to cell 0
+    final path = gameManager.boardController.playerPaths[victim.playerId];
+    if (path == null || victimPathIndex <= 0) return;
+
+    final List<List<int>> retreatCells = [];
+    // Walk backwards: from kill index down to 0
+    for (int i = victimPathIndex; i >= 0; i--) {
+      if (i < path.length) {
+        retreatCells.add(path[i]);
+      }
+    }
+
+    if (retreatCells.length >= 2) {
+      _retreatAnims[victim.id] = _PawnRetreatAnim(
+        cells: retreatCells,
+        playerId: victim.playerId,
       );
     }
   }
 
-  void animatePawnSentHome(Pawn victim) {
-    _shakeIntensity = 8.0;
-    _shakeTime = 0;
-  }
+  /// Whether any retreat animations are still playing
+  bool get hasActiveRetreatAnims => _retreatAnims.isNotEmpty;
 
   void flashPawn(Pawn pawn) {
     _flashPawnId = pawn.id;
@@ -1431,15 +1472,152 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }
 }
 
-/// Internal animation data for pawn movement
-class _PawnMoveAnim {
-  final double fromRow, fromCol, toRow, toCol;
-  double progress = 0;
+/// Hop-by-hop chain animation: pawn hops through each intermediate cell
+class _PawnHopChainAnim {
+  final List<List<int>> cells; // All cells from source to destination
+  final VoidCallback? onHopSound;
+  int currentHopIndex = 0; // Current hop (0 = first segment)
+  double hopProgress = 0; // 0→1 within current hop
+  bool _soundPlayed = false;
 
-  _PawnMoveAnim({
-    required this.fromRow,
-    required this.fromCol,
-    required this.toRow,
-    required this.toCol,
-  });
+  // Adaptive speed: short moves play slower (more visible), long moves faster
+  late final double _hopSpeed;
+
+  _PawnHopChainAnim({required this.cells, this.onHopSound}) {
+    final n = totalHops;
+    if (n <= 2) {
+      _hopSpeed = 2.8; // ~357ms per hop
+    } else if (n <= 4) {
+      _hopSpeed = 3.2; // ~312ms per hop
+    } else {
+      _hopSpeed = 3.8; // ~263ms per hop
+    }
+  }
+
+  int get totalHops => cells.length - 1;
+  bool get isComplete => currentHopIndex >= totalHops;
+
+  void update(double dt) {
+    if (isComplete) return;
+
+    hopProgress += dt * _hopSpeed;
+
+    // Play sound at the very start of each hop (threshold near zero)
+    if (!_soundPlayed) {
+      _soundPlayed = true;
+      onHopSound?.call();
+    }
+
+    // Advance to next hop when progress >= 1, carrying over overflow.
+    // Each traversed hop gets its sound played.
+    while (hopProgress >= 1.0 && !isComplete) {
+      hopProgress -= 1.0;
+      currentHopIndex++;
+      _soundPlayed = false;
+      // Immediately trigger sound for the new hop
+      if (!isComplete && !_soundPlayed) {
+        _soundPlayed = true;
+        onHopSound?.call();
+      }
+    }
+  }
+
+  Offset getCurrentPosition(double squareSize, double gap) {
+    if (isComplete) {
+      final last = cells.last;
+      return Offset(
+        last[1] * (squareSize + gap) + squareSize / 2,
+        last[0] * (squareSize + gap) + squareSize / 2,
+      );
+    }
+
+    final from = cells[currentHopIndex];
+    final to = cells[currentHopIndex + 1];
+    final t = _easeInOutCubic(hopProgress.clamp(0.0, 1.0));
+
+    final fromX = from[1] * (squareSize + gap) + squareSize / 2;
+    final fromY = from[0] * (squareSize + gap) + squareSize / 2;
+    final toX = to[1] * (squareSize + gap) + squareSize / 2;
+    final toY = to[0] * (squareSize + gap) + squareSize / 2;
+
+    return Offset(fromX + (toX - fromX) * t, fromY + (toY - fromY) * t);
+  }
+
+  double getCurrentHop(double squareSize) {
+    if (isComplete) return 0;
+    final t = hopProgress.clamp(0.0, 1.0);
+    return sin(t * pi) * squareSize * 0.38;
+  }
+
+  static double _easeInOutCubic(double t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3).toDouble() / 2;
+  }
+}
+
+/// Retreat animation: a captured pawn hops **backwards** along its path to home.
+///
+/// Faster than normal movement (speed ramps up), with a fading ghost effect.
+class _PawnRetreatAnim {
+  final List<List<int>>
+  cells; // Cells from kill-point → starting cell (reversed)
+  final int playerId;
+  int currentHopIndex = 0;
+  double hopProgress = 0;
+
+  _PawnRetreatAnim({required this.cells, required this.playerId});
+
+  int get totalHops => cells.length - 1;
+  bool get isComplete => currentHopIndex >= totalHops;
+
+  /// 0→1 overall progress (for fade calculation)
+  double get overallProgress {
+    if (totalHops <= 0) return 1.0;
+    return ((currentHopIndex + hopProgress) / totalHops).clamp(0.0, 1.0);
+  }
+
+  void update(double dt) {
+    if (isComplete) return;
+
+    // Accelerate as the retreat continues — starts visible, ends fast
+    final accel = 1.0 + overallProgress * 3.0; // 1x → 4x speed
+    final baseSpeed = totalHops <= 4 ? 5.0 : 7.0; // fast base
+    hopProgress += dt * baseSpeed * accel;
+
+    while (hopProgress >= 1.0 && !isComplete) {
+      hopProgress -= 1.0;
+      currentHopIndex++;
+    }
+  }
+
+  Offset getCurrentPosition(double squareSize, double gap) {
+    if (isComplete) {
+      final last = cells.last;
+      return Offset(
+        last[1] * (squareSize + gap) + squareSize / 2,
+        last[0] * (squareSize + gap) + squareSize / 2,
+      );
+    }
+
+    final from = cells[currentHopIndex];
+    final to = cells[currentHopIndex + 1];
+    final t = _easeInOutCubic(hopProgress.clamp(0.0, 1.0));
+
+    final fromX = from[1] * (squareSize + gap) + squareSize / 2;
+    final fromY = from[0] * (squareSize + gap) + squareSize / 2;
+    final toX = to[1] * (squareSize + gap) + squareSize / 2;
+    final toY = to[0] * (squareSize + gap) + squareSize / 2;
+
+    return Offset(fromX + (toX - fromX) * t, fromY + (toY - fromY) * t);
+  }
+
+  double getCurrentHop(double squareSize) {
+    if (isComplete) return 0;
+    final t = hopProgress.clamp(0.0, 1.0);
+    // Smaller hop arc for retreat — snappier feel
+    return sin(t * pi) * squareSize * 0.22;
+  }
+
+  static double _easeInOutCubic(double t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3).toDouble() / 2;
+  }
 }

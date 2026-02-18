@@ -21,7 +21,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set system UI to match bg-primary (Terracotta Dusk)
+  // Set system UI to match bg-primary (Slate & Persimmon)
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.edgeToEdge,
     overlays: [SystemUiOverlay.top],

@@ -6,7 +6,7 @@ import '../game/isto_game.dart';
 import '../theme/isto_tokens.dart';
 
 /// Top HUD bar — current player, last roll, pawn progress, settings.
-/// Terracotta Dusk palette, GoogleFonts Poppins.
+/// Slate & Persimmon palette, GoogleFonts Poppins.
 class TurnIndicatorOverlay extends StatelessWidget {
   final ISTOGame game;
 

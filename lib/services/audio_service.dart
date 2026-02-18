@@ -1,9 +1,14 @@
-import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
-/// Audio service for game sound effects
-/// Uses audioplayers for cross-platform audio playback
+/// Audio service using a **pooled** player architecture.
+///
+/// One [AudioPlayer] is pre-created per sound key during [initialize].
+/// Calling a play method stops any current playback of that same sound
+/// and replays it instantly — no overlapping of the same clip, no
+/// expensive player creation at runtime.
+///
+/// Different sound keys CAN overlap (e.g. cowry_roll + pawn_move).
 class AudioService {
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
@@ -13,157 +18,112 @@ class AudioService {
   bool _initialized = false;
   double _volume = 0.8;
 
-  // Single audio player that we reuse
-  AudioPlayer? _player;
-  
-  // Available sound files (matching what exists in assets/sounds/)
+  /// One AudioPlayer per sound key — pre-warmed for instant replay.
+  final Map<String, AudioPlayer> _pool = {};
+
+  // Available sound files (matching assets/sounds/)
   static const Map<String, String> _soundFiles = {
-    'roll': 'sounds/roll.mp3',
-    'move': 'sounds/move.mp3',
+    'cowry_roll': 'sounds/cowery_roll.mp3',
+    'pawn_move': 'sounds/pawn_move.mp3',
     'tap': 'sounds/tap.mp3',
-    'enter': 'sounds/enter.mp3',
-    'blocked': 'sounds/blocked.mp3',
+    'pawn_enter': 'sounds/pawn_enter_board.mp3',
+    'pawn_capture': 'sounds/pawn_captures.mp3',
+    'safe_home': 'sounds/pawn_reach_at_safe_home.mp3',
+    'reach_center': 'sounds/pawn_reach_center.mp3',
+    'isto_chome': 'sounds/for_isto_chome.mp3',
   };
 
   bool get soundEnabled => _soundEnabled;
   bool get isInitialized => _initialized;
   double get volume => _volume;
 
-  /// Initialize audio system
+  /// Pre-warm one [AudioPlayer] per sound so first play is instant.
   Future<void> initialize() async {
     if (_initialized) return;
-    
     try {
-      _player = AudioPlayer();
-      await _player!.setVolume(_volume);
-      await _player!.setReleaseMode(ReleaseMode.stop);
-      
+      for (final entry in _soundFiles.entries) {
+        final player = AudioPlayer();
+        await player.setReleaseMode(ReleaseMode.stop);
+        await player.setVolume(_volume);
+        _pool[entry.key] = player;
+      }
       _initialized = true;
-      debugPrint('AudioService: Initialized successfully');
+      debugPrint('AudioService: Pool warmed with ${_pool.length} players');
     } catch (e) {
-      debugPrint('AudioService: Failed to initialize: $e');
-      _initialized = true; // Still mark as initialized to prevent retries
+      debugPrint('AudioService: Init error: $e');
+      _initialized = true;
     }
   }
 
   void setSoundEnabled(bool enabled) {
     _soundEnabled = enabled;
+    if (!enabled) stopAll();
     debugPrint('AudioService: Sound ${enabled ? "enabled" : "disabled"}');
   }
 
   void setVolume(double volume) {
     _volume = volume.clamp(0.0, 1.0);
-    _player?.setVolume(_volume);
+    for (final p in _pool.values) {
+      p.setVolume(_volume);
+    }
   }
 
-  /// Dispose audio resources
+  /// Stop every active player.
+  void stopAll() {
+    for (final p in _pool.values) {
+      p.stop();
+    }
+  }
+
+  /// Dispose all pooled players.
   void dispose() {
-    _player?.dispose();
-    _player = null;
+    for (final p in _pool.values) {
+      p.dispose();
+    }
+    _pool.clear();
     _initialized = false;
   }
 
-  /// Play a sound by name
-  Future<void> _playSound(String name) async {
-    if (!_soundEnabled) {
-      debugPrint('AudioService: Sound disabled, skipping $name');
-      return;
+  /// Core playback — stops previous instance of [name], then replays.
+  /// Fully fire-and-forget; callers never need to await.
+  void _playSound(String name) {
+    if (!_soundEnabled) return;
+    final file = _soundFiles[name];
+    if (file == null) return;
+
+    var player = _pool[name];
+    if (player == null) {
+      // Pool wasn't warmed — create on demand
+      player = AudioPlayer();
+      player.setReleaseMode(ReleaseMode.stop);
+      player.setVolume(_volume);
+      _pool[name] = player;
     }
-    
-    final soundFile = _soundFiles[name];
-    if (soundFile == null) {
-      debugPrint('AudioService: Unknown sound: $name');
-      return;
-    }
-    
-    try {
-      // Create a new player for each sound to allow overlapping
-      final player = AudioPlayer();
-      await player.setVolume(_volume);
-      await player.setReleaseMode(ReleaseMode.release);
-      await player.play(AssetSource(soundFile));
-      debugPrint('AudioService: Playing $name');
-      
-      // Auto dispose after playback
-      player.onPlayerComplete.listen((_) {
-        player.dispose();
-      });
-    } catch (e) {
-      debugPrint('AudioService: Error playing $name: $e');
-    }
+
+    // Stop current playback (if any) then replay
+    player
+        .stop()
+        .then((_) {
+          player!.play(AssetSource(file));
+        })
+        .catchError((e) {
+          debugPrint('AudioService: play error ($name): $e');
+        });
   }
 
-  // ============ SOUND EFFECT METHODS ============
+  // ============ FIRE-AND-FORGET SOUND METHODS ============
 
-  /// Play dice/cowry roll sound
-  Future<void> playRollSound() async {
-    await _playSound('roll');
-  }
-
-  /// Play shell settle sound
-  Future<void> playShellSettle() async {
-    await _playSound('roll');
-  }
-
-  /// Play pawn select/tap sound
-  Future<void> playPawnSelect() async {
-    await _playSound('tap');
-  }
-
-  /// Play pawn move sound
-  Future<void> playPawnMove() async {
-    await _playSound('move');
-  }
-
-  /// Play pawn enter board sound
-  Future<void> playPawnEnter() async {
-    await _playSound('enter');
-  }
-
-  /// Play capture/kill sound - DRAMATIC using blocked for sharp impact
-  Future<void> playCapture() async {
-    await _playSound('blocked');
-  }
-
-  /// Play CHOWKA (4) or ASHTA (8) sound - celebratory roll
-  Future<void> playGraceThrow() async {
-    await _playSound('roll');
-  }
-
-  /// Play extra turn notification - celebratory
-  Future<void> playExtraTurn() async {
-    await _playSound('roll');
-  }
-
-  /// Play pawn reaching home/center - triumphant
-  Future<void> playPawnFinish() async {
-    await _playSound('enter');
-  }
-
-  /// Play win/victory sound - triumphant
-  Future<void> playWin() async {
-    await _playSound('enter');
-  }
-
-  /// Play blocked/no moves sound
-  Future<void> playBlocked() async {
-    await _playSound('blocked');
-  }
-
-  /// Play invalid move/error sound
-  Future<void> playError() async {
-    await _playSound('blocked');
-  }
-
-  /// Play turn change notification
-  Future<void> playTurnChange() async {
-    await _playSound('tap');
-  }
-
-  /// Play double formed sound
-  Future<void> playDouble() async {
-    await _playSound('move');
-  }
+  void playRollSound() => _playSound('cowry_roll');
+  void playPawnSelect() => _playSound('tap');
+  void playPawnMove() => _playSound('pawn_move');
+  void playPawnEnter() => _playSound('pawn_enter');
+  void playCapture() => _playSound('pawn_capture');
+  void playGraceThrow() => _playSound('isto_chome');
+  void playSafeHome() => _playSound('safe_home');
+  void playPawnFinish() => _playSound('reach_center');
+  void playWin() => _playSound('reach_center');
+  void playBlocked() => _playSound('tap');
+  void playError() => _playSound('tap');
 }
 
 /// Global audio service instance

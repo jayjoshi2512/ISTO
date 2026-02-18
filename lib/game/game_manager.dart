@@ -148,14 +148,21 @@ class GameManager {
   /// Called by UI when cowry roll animation finishes
   void onCowryAnimationComplete() {
     _cowryAnimating = false;
-    // Now show the deferred highlights
-    if (_pendingHighlights != null && _pendingHighlights!.isNotEmpty) {
-      onValidMovesCalculated?.call(_pendingHighlights!);
-      // If AI, schedule move now
-      if (isCurrentPlayerAI &&
-          aiController != null &&
-          _pendingHighlightRoll != null) {
-        _scheduleAIMove(_pendingHighlights!, _pendingHighlightRoll!);
+    // Show deferred highlights or handle no-moves
+    if (_pendingHighlights != null) {
+      if (_pendingHighlights!.isNotEmpty) {
+        onValidMovesCalculated?.call(_pendingHighlights!);
+        // If AI, schedule move now
+        if (isCurrentPlayerAI &&
+            aiController != null &&
+            _pendingHighlightRoll != null) {
+          _scheduleAIMove(_pendingHighlights!, _pendingHighlightRoll!);
+        }
+      } else {
+        // No valid moves — fire now that cowry animation is done
+        onNoValidMoves?.call();
+        turnStateMachine.onNoValidMoves();
+        _checkGameState();
       }
     }
     _pendingHighlights = null;
@@ -173,11 +180,8 @@ class GameManager {
 
     final roll = cowryController.roll();
 
-    if (roll.grantsExtraTurn) {
-      feedbackService.onGraceThrow();
-    } else {
-      feedbackService.onRoll();
-    }
+    // NOTE: Sound is NOT played here — it's played when the cowry animation
+    // actually begins visually, to keep sound synced with the visual.
 
     // Mark cowry animation as in progress
     _cowryAnimating = true;
@@ -191,15 +195,9 @@ class GameManager {
     final validPawns = _getValidPawns(roll);
 
     if (validPawns.isEmpty) {
-      feedbackService.onNoMoves();
-      // Defer no-moves notification until after animation
+      // Defer no-moves — handled when cowry animation completes
       _pendingHighlights = [];
       _pendingHighlightRoll = roll;
-      Timer(const Duration(milliseconds: 900), () {
-        onNoValidMoves?.call();
-        turnStateMachine.onNoValidMoves();
-        _checkGameState();
-      });
     } else {
       // Defer highlights until cowry animation completes
       _pendingHighlights = validPawns;
@@ -393,13 +391,29 @@ class GameManager {
     }
 
     final hasCaptured = hasPlayerCaptured(pawn.playerId);
-    if (!boardController.canPawnMove(
+    // Check full-step move first
+    bool canMove = boardController.canPawnMove(
       pawn,
       roll.steps,
       pawnController.pawns,
       roll.allowsEntry,
       hasCaptured,
-    )) {
+    );
+    // Also allow if stacked split would work (e.g. 2 pawns, roll=2, each 1 step)
+    if (!canMove && pawn.isActive && !pawn.isFinished) {
+      final stackedPawns = getStackedPawns(pawn);
+      if (stackedPawns.length > 1 && roll.steps >= stackedPawns.length) {
+        final splitSteps = roll.steps ~/ stackedPawns.length;
+        canMove = boardController.canPawnMove(
+          pawn,
+          splitSteps,
+          pawnController.pawns,
+          roll.allowsEntry,
+          hasCaptured,
+        );
+      }
+    }
+    if (!canMove) {
       feedbackService.onInvalidMove();
       return MoveResult.failed('Pawn cannot move');
     }
@@ -411,9 +425,23 @@ class GameManager {
         isPawnOnInnerPath(pawn) &&
         movePawnCount == 0 &&
         !isCurrentPlayerAI) {
-      feedbackService.mediumTap();
-      onStackedPawnChoice?.call(pawn, stackedPawns.length);
-      return MoveResult.failed('Waiting for stacked pawn choice');
+      // Check if a single-pawn full-step move is even possible
+      final singleCanMove = boardController.canPawnMove(
+        pawn,
+        roll.steps,
+        pawnController.pawns,
+        roll.allowsEntry,
+        hasCaptured,
+      );
+      if (!singleCanMove) {
+        // Single pawn can't use full steps (would overshoot).
+        // Auto-select "move all together" — no dialog needed.
+        movePawnCount = stackedPawns.length;
+      } else {
+        feedbackService.mediumTap();
+        onStackedPawnChoice?.call(pawn, stackedPawns.length);
+        return MoveResult.failed('Waiting for stacked pawn choice');
+      }
     }
 
     feedbackService.onPawnSelect();
@@ -422,7 +450,6 @@ class GameManager {
     MoveResult result;
     if (pawn.isHome) {
       result = pawnController.enterPawn(pawn);
-      feedbackService.onPawnEnter();
     } else {
       if (movePawnCount > 1 && stackedPawns.length >= movePawnCount) {
         final pawnsToMove = stackedPawns.take(movePawnCount).toList();
@@ -433,17 +460,11 @@ class GameManager {
       } else {
         result = pawnController.movePawn(pawn, roll.steps, attackerCount: 1);
       }
-      feedbackService.onPawnMove();
     }
 
     if (result.killedOpponent) {
       captureCount[pawn.playerId] =
           (captureCount[pawn.playerId] ?? 0) + result.victims.length;
-      feedbackService.onCapture();
-    }
-
-    if (result.reachedCenter) {
-      feedbackService.onPawnFinish();
     }
 
     turnStateMachine.onMoveComplete(result);
@@ -451,7 +472,6 @@ class GameManager {
     if (pawnController.hasPlayerWon(pawn.playerId)) {
       turnStateMachine.markPlayerFinished(pawn.playerId);
       players[pawn.playerId].rank = turnStateMachine.getRank(pawn.playerId);
-      feedbackService.onWin();
       onPlayerFinished?.call(pawn.playerId);
     }
 
@@ -472,14 +492,9 @@ class GameManager {
     } else if (turnStateMachine.extraTurnPending ||
         currentPhase == TurnPhase.checkingExtraTurn) {
       if (turnStateMachine.extraTurnPending) {
-        feedbackService.onExtraTurn();
         onExtraTurn?.call();
       }
       turnStateMachine.endTurn();
-
-      if (!turnStateMachine.extraTurnPending) {
-        feedbackService.onTurnStart();
-      }
 
       // Schedule AI roll if next turn is AI
       if (isCurrentPlayerAI && !isGameOver) {

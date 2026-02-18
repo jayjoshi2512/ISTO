@@ -6,7 +6,7 @@ import '../config/design_system.dart';
 import '../theme/isto_tokens.dart';
 
 /// Animated background with floating particles and warm ambient glow.
-/// Uses IstoColorsDark tokens for the Terracotta Dusk palette.
+/// Uses IstoColorsDark tokens for the Slate & Persimmon palette.
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
   final bool showParticles;

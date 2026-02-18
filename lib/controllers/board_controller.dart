@@ -95,14 +95,51 @@ class BoardController {
   ]) {
     final playerPawns = allPawns.where((p) => p.playerId == playerId).toList();
     final validPawns = <Pawn>[];
+    final addedIds = <String>{};
 
     for (final pawn in playerPawns) {
+      if (addedIds.contains(pawn.id)) continue;
       if (canPawnMove(pawn, steps, allPawns, allowsEntry, hasCaptured)) {
         validPawns.add(pawn);
+        addedIds.add(pawn.id);
+      } else if (pawn.isActive && !pawn.isFinished) {
+        // Also check if this pawn could move as part of a stacked-split.
+        // E.g. 2 stacked pawns, roll=2, each moves 1 step to center.
+        final pos = getPawnPosition(pawn, allPawns);
+        if (pos != null) {
+          final square = getSquare(pos);
+          if (square != null) {
+            final stackCount = square.getFriendlyPawns(pawn.playerId).length;
+            if (stackCount > 1 && steps >= stackCount) {
+              final splitSteps = steps ~/ stackCount;
+              if (canPawnMove(
+                pawn,
+                splitSteps,
+                allPawns,
+                allowsEntry,
+                hasCaptured,
+              )) {
+                validPawns.add(pawn);
+                addedIds.add(pawn.id);
+              }
+            }
+          }
+        }
       }
     }
 
     return validPawns;
+  }
+
+  /// Get a pawn's current board position
+  Position? getPawnPosition(Pawn pawn, List<Pawn> allPawns) {
+    if (!pawn.isActive) return null;
+    final path = playerPaths[pawn.playerId];
+    if (path == null || pawn.pathIndex < 0 || pawn.pathIndex >= path.length) {
+      return null;
+    }
+    final coords = path[pawn.pathIndex];
+    return Position(coords[0], coords[1]);
   }
 
   /// Check if a specific pawn can move
