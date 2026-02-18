@@ -3,8 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
+import '../theme/isto_tokens.dart';
 
-/// Animated background with floating particles and warm ambient glow
+/// Animated background with floating particles and warm ambient glow.
+/// Uses IstoColorsDark tokens for the Terracotta Dusk palette.
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
   final bool showParticles;
@@ -56,21 +58,22 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(gradient: DesignSystem.bgGradient),
-      child: widget.showParticles
-          ? GameAnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: _BackgroundPainter(
-                    particles: _particles,
-                    time: _controller.value,
-                  ),
-                  child: child,
-                );
-              },
-              child: widget.child,
-            )
-          : widget.child,
+      child:
+          widget.showParticles
+              ? GameAnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: _BackgroundPainter(
+                      particles: _particles,
+                      time: _controller.value,
+                    ),
+                    child: child,
+                  );
+                },
+                child: widget.child,
+              )
+              : widget.child,
     );
   }
 }
@@ -108,9 +111,12 @@ class _BackgroundPainter extends CustomPainter {
       final px = (p.x + sin(time * 2 * pi + p.phase) * 0.02) * size.width;
       final py = ((p.y - time * p.speed * 5) % 1.0) * size.height;
 
-      final paint = Paint()
-        ..color = DesignSystem.accent.withValues(alpha: p.opacity * 0.5)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.size);
+      final paint =
+          Paint()
+            ..color = IstoColorsDark.accentGlow.withValues(
+              alpha: p.opacity * 0.5,
+            )
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.size);
 
       canvas.drawCircle(Offset(px, py), p.size, paint);
     }
@@ -125,7 +131,7 @@ class _BackgroundPainter extends CustomPainter {
       center: Alignment.center,
       radius: 0.8,
       colors: [
-        DesignSystem.accent.withValues(alpha: 0.03),
+        IstoColorsDark.accentPrimary.withValues(alpha: 0.03),
         Colors.transparent,
       ],
     );
@@ -139,10 +145,7 @@ class _BackgroundPainter extends CustomPainter {
     final gradient = RadialGradient(
       center: Alignment.center,
       radius: 1.0,
-      colors: [
-        Colors.transparent,
-        Colors.black.withValues(alpha: 0.3),
-      ],
+      colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
     );
     canvas.drawRect(
       Offset.zero & size,
@@ -184,7 +187,7 @@ class GlassContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.08),
+            IstoColorsDark.bgElevated.withValues(alpha: 0.5),
             Colors.white.withValues(alpha: 0.03),
           ],
         ),
@@ -230,10 +233,8 @@ class _ShimmerEffectState extends State<ShimmerEffect>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    )..repeat();
+    _controller = AnimationController(vsync: this, duration: widget.duration)
+      ..repeat();
   }
 
   @override
@@ -252,11 +253,7 @@ class _ShimmerEffectState extends State<ShimmerEffect>
             return LinearGradient(
               begin: Alignment(-1 + _controller.value * 3, 0),
               end: Alignment(-0.5 + _controller.value * 3, 0),
-              colors: [
-                Colors.transparent,
-                widget.color,
-                Colors.transparent,
-              ],
+              colors: [Colors.transparent, widget.color, Colors.transparent],
             ).createShader(bounds);
           },
           blendMode: BlendMode.srcATop,

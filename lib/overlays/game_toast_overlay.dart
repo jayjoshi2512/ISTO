@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../config/design_system.dart';
 import '../game/isto_game.dart';
+import '../theme/isto_tokens.dart';
 
-/// Toast overlay for extra turns
+/// Toast overlay for extra turns — gold pill banner
 class ExtraTurnOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -69,17 +70,17 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    DesignSystem.accent.withValues(alpha: 0.2),
-                    DesignSystem.accentDark.withValues(alpha: 0.15),
+                    IstoColorsDark.accentPrimary.withValues(alpha: 0.2),
+                    IstoColorsDark.accentWarm.withValues(alpha: 0.15),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+                borderRadius: BorderRadius.circular(IstoRadius.pill),
                 border: Border.all(
-                  color: DesignSystem.accent.withValues(alpha: 0.4),
+                  color: IstoColorsDark.accentPrimary.withValues(alpha: 0.4),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: DesignSystem.accent.withValues(alpha: 0.2),
+                    color: IstoColorsDark.accentPrimary.withValues(alpha: 0.2),
                     blurRadius: 16,
                   ),
                 ],
@@ -87,14 +88,18 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.stars_rounded,
-                      color: DesignSystem.accent, size: 20),
+                  Icon(
+                    Icons.stars_rounded,
+                    color: IstoColorsDark.accentPrimary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'EXTRA TURN!',
-                    style: DesignSystem.bodyLarge.copyWith(
-                      color: DesignSystem.accent,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
+                      color: IstoColorsDark.accentPrimary,
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -108,7 +113,7 @@ class _ExtraTurnOverlayState extends State<ExtraTurnOverlay>
   }
 }
 
-/// Toast overlay for capturing opponent's pawn
+/// Toast overlay for capturing opponent's pawn — red pill banner
 class CaptureOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -132,9 +137,10 @@ class _CaptureOverlayState extends State<CaptureOverlay>
       duration: const Duration(milliseconds: 500),
     );
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
+    _scale = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
 
     _ctrl.forward();
 
@@ -171,17 +177,17 @@ class _CaptureOverlayState extends State<CaptureOverlay>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    DesignSystem.danger.withValues(alpha: 0.2),
-                    const Color(0xFFFF1744).withValues(alpha: 0.15),
+                    IstoColorsDark.danger.withValues(alpha: 0.2),
+                    IstoColorsDark.danger.withValues(alpha: 0.12),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+                borderRadius: BorderRadius.circular(IstoRadius.pill),
                 border: Border.all(
-                  color: DesignSystem.danger.withValues(alpha: 0.4),
+                  color: IstoColorsDark.danger.withValues(alpha: 0.4),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: DesignSystem.danger.withValues(alpha: 0.2),
+                    color: IstoColorsDark.danger.withValues(alpha: 0.2),
                     blurRadius: 16,
                   ),
                 ],
@@ -189,14 +195,18 @@ class _CaptureOverlayState extends State<CaptureOverlay>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.gps_fixed_rounded,
-                      color: DesignSystem.danger, size: 20),
+                  Icon(
+                    Icons.gps_fixed_rounded,
+                    color: IstoColorsDark.danger,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'CAPTURED!',
-                    style: DesignSystem.bodyLarge.copyWith(
-                      color: DesignSystem.danger,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
+                      color: IstoColorsDark.danger,
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -210,7 +220,7 @@ class _CaptureOverlayState extends State<CaptureOverlay>
   }
 }
 
-/// Toast overlay for no valid moves
+/// Toast overlay for no valid moves — muted pill banner
 class NoMovesOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -264,23 +274,27 @@ class _NoMovesOverlayState extends State<NoMovesOverlay>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: DesignSystem.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(DesignSystem.radiusFull),
+              color: IstoColorsDark.bgElevated.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(IstoRadius.pill),
               border: Border.all(
-                color: DesignSystem.textMuted.withValues(alpha: 0.3),
+                color: IstoColorsDark.textMuted.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.block_rounded,
-                    color: DesignSystem.textMuted, size: 18),
+                Icon(
+                  Icons.block_rounded,
+                  color: IstoColorsDark.textMuted,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'No valid moves',
-                  style: DesignSystem.bodyMedium.copyWith(
-                    color: DesignSystem.textSecondary,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
+                    color: IstoColorsDark.textSecondary,
                   ),
                 ),
               ],

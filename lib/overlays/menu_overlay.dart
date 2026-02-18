@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/design_system.dart';
 import '../config/player_colors.dart';
 import '../game/isto_game.dart';
 import '../models/game_mode.dart';
+import '../theme/isto_tokens.dart';
 import '../components/animated_background.dart';
 
-/// Premium game menu with mode selection, player count, and AI difficulty
+/// Home / Menu screen — clean vertical stack, board-centric.
+/// Terracotta Dusk palette, GoogleFonts Poppins + Lora.
 class MenuOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -33,13 +36,16 @@ class _MenuOverlayState extends State<MenuOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _fadeIn = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut),
-    );
+    _fadeIn = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut));
     _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.1),
+      begin: const Offset(0, 0.06),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic));
+    ).animate(
+      CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic),
+    );
     _entranceCtrl.forward();
   }
 
@@ -49,6 +55,7 @@ class _MenuOverlayState extends State<MenuOverlay>
     super.dispose();
   }
 
+  // ── Business logic untouched ──
   void _startGame() {
     GameConfig config;
     if (_selectedMode == GameMode.vsAI) {
@@ -72,31 +79,27 @@ class _MenuOverlayState extends State<MenuOverlay>
             position: _slideUp,
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox(height: 40),
-                    // Title
+                    const SizedBox(height: 44),
                     _buildTitle(),
-                    const SizedBox(height: 48),
-                    // Game Mode Selection
-                    _buildModeSelection(),
-                    const SizedBox(height: 28),
-                    // Player Count
-                    _buildPlayerCount(),
-                    const SizedBox(height: 28),
-                    // AI Difficulty (only for vs AI mode)
-                    if (_selectedMode == GameMode.vsAI) ...[
-                      _buildAIDifficulty(),
-                      const SizedBox(height: 28),
-                    ],
-                    // Board Preview
+                    const SizedBox(height: 36),
+                    // Mini board preview at 45° tilt
                     _buildBoardPreview(),
                     const SizedBox(height: 36),
-                    // Start Button
+                    _buildModeSelection(),
+                    const SizedBox(height: 20),
+                    _buildPlayerCount(),
+                    const SizedBox(height: 20),
+                    if (_selectedMode == GameMode.vsAI) ...[
+                      _buildAIDifficulty(),
+                      const SizedBox(height: 20),
+                    ],
+                    const SizedBox(height: 8),
                     _buildStartButton(),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 36),
                   ],
                 ),
               ),
@@ -107,54 +110,24 @@ class _MenuOverlayState extends State<MenuOverlay>
     );
   }
 
+  // ── Title block ──
   Widget _buildTitle() {
     return Column(
       children: [
-        // Game logo
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: DesignSystem.goldGradient,
-            boxShadow: [
-              BoxShadow(
-                color: DesignSystem.accent.withValues(alpha: 0.4),
-                blurRadius: 24,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text(
-              'I',
-              style: TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1A0E04),
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
         Text(
           'ISTO',
-          style: DesignSystem.displayLarge.copyWith(letterSpacing: 8),
+          style: GoogleFonts.lora(textStyle: IstoTypography.appTitle),
         ),
         const SizedBox(height: 4),
         Text(
-          'Chowka Bhara',
-          style: DesignSystem.bodyMedium.copyWith(
-            color: DesignSystem.accent.withValues(alpha: 0.7),
-            letterSpacing: 3,
-            fontSize: 13,
-          ),
+          'Chowka Bara',
+          style: GoogleFonts.poppins(textStyle: IstoTypography.subtitle),
         ),
       ],
     );
   }
 
+  // ── Mode selection ──
   Widget _buildModeSelection() {
     return GlassContainer(
       padding: const EdgeInsets.all(16),
@@ -163,8 +136,10 @@ class _MenuOverlayState extends State<MenuOverlay>
         children: [
           Text(
             'GAME MODE',
-            style: DesignSystem.caption.copyWith(
-              color: DesignSystem.accent,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: IstoColorsDark.accentPrimary,
               letterSpacing: 2,
             ),
           ),
@@ -177,9 +152,10 @@ class _MenuOverlayState extends State<MenuOverlay>
                   label: 'Local',
                   subtitle: 'Pass & Play',
                   isSelected: _selectedMode == GameMode.localMultiplayer,
-                  onTap: () => setState(() {
-                    _selectedMode = GameMode.localMultiplayer;
-                  }),
+                  onTap:
+                      () => setState(() {
+                        _selectedMode = GameMode.localMultiplayer;
+                      }),
                 ),
               ),
               const SizedBox(width: 12),
@@ -189,9 +165,10 @@ class _MenuOverlayState extends State<MenuOverlay>
                   label: 'vs AI',
                   subtitle: 'Play Robot',
                   isSelected: _selectedMode == GameMode.vsAI,
-                  onTap: () => setState(() {
-                    _selectedMode = GameMode.vsAI;
-                  }),
+                  onTap:
+                      () => setState(() {
+                        _selectedMode = GameMode.vsAI;
+                      }),
                 ),
               ),
             ],
@@ -201,6 +178,7 @@ class _MenuOverlayState extends State<MenuOverlay>
     );
   }
 
+  // ── Player count selector ──
   Widget _buildPlayerCount() {
     return GlassContainer(
       padding: const EdgeInsets.all(16),
@@ -209,74 +187,86 @@ class _MenuOverlayState extends State<MenuOverlay>
         children: [
           Text(
             'PLAYERS',
-            style: DesignSystem.caption.copyWith(
-              color: DesignSystem.accent,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: IstoColorsDark.accentPrimary,
               letterSpacing: 2,
             ),
           ),
           const SizedBox(height: 12),
           Row(
-            children: [2, 3, 4].map((count) {
-              final isSelected = _playerCount == count;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _playerCount = count),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? DesignSystem.accent.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? DesignSystem.accent.withValues(alpha: 0.5)
-                            : Colors.white.withValues(alpha: 0.06),
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '$count',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? DesignSystem.accent
-                                : DesignSystem.textSecondary,
+            children:
+                [2, 3, 4].map((count) {
+                  final isSelected = _playerCount == count;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _playerCount = count),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected
+                                  ? IstoColorsDark.accentPrimary.withValues(
+                                    alpha: 0.15,
+                                  )
+                                  : Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(IstoRadius.md),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? IstoColorsDark.accentPrimary.withValues(
+                                      alpha: 0.5,
+                                    )
+                                    : Colors.white.withValues(alpha: 0.06),
+                            width: isSelected ? 1.5 : 1,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        // Player color dots
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(count, (i) {
-                            return Container(
-                              width: 8,
-                              height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              decoration: BoxDecoration(
-                                color: PlayerColors.getColor(i),
-                                shape: BoxShape.circle,
+                        child: Column(
+                          children: [
+                            Text(
+                              '$count',
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color:
+                                    isSelected
+                                        ? IstoColorsDark.accentPrimary
+                                        : IstoColorsDark.textSecondary,
                               ),
-                            );
-                          }),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(count, (i) {
+                                return Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: PlayerColors.getColor(i),
+                                    shape: BoxShape.circle,
+                                  ),
+                                );
+                              }),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
         ],
       ),
     );
   }
 
+  // ── AI difficulty ──
   Widget _buildAIDifficulty() {
     return GlassContainer(
       padding: const EdgeInsets.all(16),
@@ -285,98 +275,120 @@ class _MenuOverlayState extends State<MenuOverlay>
         children: [
           Text(
             'AI DIFFICULTY',
-            style: DesignSystem.caption.copyWith(
-              color: DesignSystem.accent,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: IstoColorsDark.accentPrimary,
               letterSpacing: 2,
             ),
           ),
           const SizedBox(height: 12),
           Row(
-            children: AIDifficulty.values.map((diff) {
-              final isSelected = _aiDifficulty == diff;
-              final label = switch (diff) {
-                AIDifficulty.easy => 'Easy',
-                AIDifficulty.medium => 'Medium',
-                AIDifficulty.hard => 'Hard',
-              };
-              final icon = switch (diff) {
-                AIDifficulty.easy => Icons.sentiment_satisfied,
-                AIDifficulty.medium => Icons.psychology,
-                AIDifficulty.hard => Icons.bolt,
-              };
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _aiDifficulty = diff),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? DesignSystem.accent.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? DesignSystem.accent.withValues(alpha: 0.5)
-                            : Colors.white.withValues(alpha: 0.06),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          icon,
-                          size: 22,
-                          color: isSelected
-                              ? DesignSystem.accent
-                              : DesignSystem.textMuted,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w400,
-                            color: isSelected
-                                ? DesignSystem.accent
-                                : DesignSystem.textSecondary,
+            children:
+                AIDifficulty.values.map((diff) {
+                  final isSelected = _aiDifficulty == diff;
+                  final label = switch (diff) {
+                    AIDifficulty.easy => 'Easy',
+                    AIDifficulty.medium => 'Medium',
+                    AIDifficulty.hard => 'Hard',
+                  };
+                  final icon = switch (diff) {
+                    AIDifficulty.easy => Icons.sentiment_satisfied,
+                    AIDifficulty.medium => Icons.psychology,
+                    AIDifficulty.hard => Icons.bolt,
+                  };
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _aiDifficulty = diff),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected
+                                  ? IstoColorsDark.accentPrimary.withValues(
+                                    alpha: 0.15,
+                                  )
+                                  : Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(IstoRadius.md),
+                          border: Border.all(
+                            color:
+                                isSelected
+                                    ? IstoColorsDark.accentPrimary.withValues(
+                                      alpha: 0.5,
+                                    )
+                                    : Colors.white.withValues(alpha: 0.06),
                           ),
                         ),
-                      ],
+                        child: Column(
+                          children: [
+                            Icon(
+                              icon,
+                              size: 22,
+                              color:
+                                  isSelected
+                                      ? IstoColorsDark.accentPrimary
+                                      : IstoColorsDark.textMuted,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              label,
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight:
+                                    isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                color:
+                                    isSelected
+                                        ? IstoColorsDark.accentPrimary
+                                        : IstoColorsDark.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
         ],
       ),
     );
   }
 
+  // ── Board preview with 45° decorative tilt ──
   Widget _buildBoardPreview() {
-    return SizedBox(
-      height: 80,
-      child: CustomPaint(
-        painter: _MiniBoardPreview(
-          playerCount: _playerCount,
+    return Transform(
+      alignment: Alignment.center,
+      transform:
+          Matrix4.identity()
+            ..setEntry(3, 2, 0.001) // perspective
+            ..rotateX(0.18)
+            ..rotateZ(-0.05),
+      child: SizedBox(
+        height: 100,
+        child: CustomPaint(
+          painter: _MiniBoardPreview(playerCount: _playerCount),
+          size: const Size(100, 100),
         ),
-        size: const Size(80, 80),
       ),
     );
   }
 
+  // ── Start button ──
   Widget _buildStartButton() {
     return PremiumButton(
-      label: _selectedMode == GameMode.vsAI ? 'PLAY VS AI' : 'START GAME',
+      label: _selectedMode == GameMode.vsAI ? 'PLAY VS AI' : 'PLAY',
       icon: Icons.play_arrow_rounded,
       onTap: _startGame,
-      width: 220,
+      width: 200,
     );
   }
 }
 
+// ── Mode button (Local / vs AI) ──
 class _ModeButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -400,14 +412,16 @@ class _ModeButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? DesignSystem.accent.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.03),
+          color:
+              isSelected
+                  ? IstoColorsDark.accentPrimary.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected
-                ? DesignSystem.accent.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.06),
+            color:
+                isSelected
+                    ? IstoColorsDark.accentPrimary.withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.06),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -416,27 +430,32 @@ class _ModeButton extends StatelessWidget {
             Icon(
               icon,
               size: 28,
-              color: isSelected ? DesignSystem.accent : DesignSystem.textMuted,
+              color:
+                  isSelected
+                      ? IstoColorsDark.accentPrimary
+                      : IstoColorsDark.textMuted,
             ),
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 15,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? DesignSystem.textPrimary
-                    : DesignSystem.textSecondary,
+                color:
+                    isSelected
+                        ? IstoColorsDark.textPrimary
+                        : IstoColorsDark.textSecondary,
               ),
             ),
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 11,
-                color: isSelected
-                    ? DesignSystem.accent.withValues(alpha: 0.7)
-                    : DesignSystem.textMuted,
+                color:
+                    isSelected
+                        ? IstoColorsDark.accentPrimary.withValues(alpha: 0.7)
+                        : IstoColorsDark.textMuted,
               ),
             ),
           ],
@@ -446,6 +465,7 @@ class _ModeButton extends StatelessWidget {
   }
 }
 
+// ── Mini board for the menu ──
 class _MiniBoardPreview extends CustomPainter {
   final int playerCount;
 
@@ -453,10 +473,9 @@ class _MiniBoardPreview extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final squareSize = size.width / 7;
+    final squareSize = size.width / 5.5;
     final offset = (size.width - squareSize * 5) / 2;
 
-    // Draw 5x5 grid
     for (int r = 0; r < 5; r++) {
       for (int c = 0; c < 5; c++) {
         final x = offset + c * squareSize;
@@ -465,9 +484,11 @@ class _MiniBoardPreview extends CustomPainter {
 
         Color color;
         if (r == 2 && c == 2) {
-          color = const Color(0xFFFFD700).withValues(alpha: 0.6);
+          color = IstoColorsDark.accentGlow.withValues(alpha: 0.55);
+        } else if ((r + c) % 2 == 0) {
+          color = IstoColorsDark.boardCell.withValues(alpha: 0.85);
         } else {
-          color = const Color(0xFF2A1A08).withValues(alpha: 0.8);
+          color = IstoColorsDark.boardCellAlt.withValues(alpha: 0.85);
         }
 
         canvas.drawRRect(
@@ -477,21 +498,35 @@ class _MiniBoardPreview extends CustomPainter {
       }
     }
 
-    // Draw player position dots
-    final positions = [
-      [4, 2], // P0 bottom
-      [0, 2], // P1 top
-      [2, 0], // P2 left
-      [2, 4], // P3 right
-    ];
+    // Grid lines
+    final linePaint =
+        Paint()
+          ..color = IstoColorsDark.boardLine.withValues(alpha: 0.4)
+          ..strokeWidth = 0.5;
+    for (int i = 0; i <= 5; i++) {
+      final p = offset + i * squareSize;
+      canvas.drawLine(Offset(p, 0), Offset(p, 5 * squareSize), linePaint);
+      canvas.drawLine(
+        Offset(offset, i * squareSize),
+        Offset(offset + 5 * squareSize, i * squareSize),
+        linePaint,
+      );
+    }
 
+    // Player position dots
+    final positions = [
+      [4, 2],
+      [0, 2],
+      [2, 0],
+      [2, 4],
+    ];
     for (int i = 0; i < playerCount; i++) {
       final pos = positions[i];
       final x = offset + pos[1] * squareSize + squareSize / 2;
       final y = pos[0] * squareSize + squareSize / 2;
       canvas.drawCircle(
         Offset(x, y),
-        squareSize * 0.3,
+        squareSize * 0.28,
         Paint()..color = PlayerColors.getColor(i),
       );
     }

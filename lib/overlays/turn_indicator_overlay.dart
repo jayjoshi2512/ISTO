@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../config/design_system.dart';
 import '../config/theme_config.dart';
 import '../game/isto_game.dart';
+import '../theme/isto_tokens.dart';
 
-/// Top bar showing current player, last roll, and settings access
+/// Top HUD bar — current player, last roll, pawn progress, settings.
+/// Terracotta Dusk palette, GoogleFonts Poppins.
 class TurnIndicatorOverlay extends StatelessWidget {
   final ISTOGame game;
 
@@ -30,10 +32,10 @@ class TurnIndicatorOverlay extends StatelessWidget {
             gradient: LinearGradient(
               colors: [
                 player.color.withValues(alpha: 0.15),
-                DesignSystem.bgDark.withValues(alpha: 0.9),
+                IstoColorsDark.bgPrimary.withValues(alpha: 0.9),
               ],
             ),
-            borderRadius: BorderRadius.circular(DesignSystem.radiusMd),
+            borderRadius: BorderRadius.circular(IstoRadius.md),
             border: Border.all(
               color: player.color.withValues(alpha: 0.3),
               width: 1,
@@ -41,7 +43,7 @@ class TurnIndicatorOverlay extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Player indicator dot
+              // Player indicator dot with glow
               Container(
                 width: 14,
                 height: 14,
@@ -57,35 +59,42 @@ class TurnIndicatorOverlay extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // Player name and AI badge
+              // Player name + AI badge
               Expanded(
                 child: Row(
                   children: [
                     Text(
                       player.name,
-                      style: DesignSystem.bodyLarge.copyWith(
-                        color: DesignSystem.textPrimary,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
+                        color: IstoColorsDark.textPrimary,
                       ),
                     ),
                     if (isAI) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: DesignSystem.accent.withValues(alpha: 0.2),
+                          color: IstoColorsDark.accentPrimary.withValues(
+                            alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: DesignSystem.accent.withValues(alpha: 0.3),
+                            color: IstoColorsDark.accentPrimary.withValues(
+                              alpha: 0.3,
+                            ),
                           ),
                         ),
                         child: Text(
                           'AI',
-                          style: DesignSystem.caption.copyWith(
-                            color: DesignSystem.accent,
-                            fontWeight: FontWeight.w800,
+                          style: GoogleFonts.poppins(
                             fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: IstoColorsDark.accentPrimary,
                           ),
                         ),
                       ),
@@ -93,44 +102,53 @@ class TurnIndicatorOverlay extends StatelessWidget {
                   ],
                 ),
               ),
-              // Last roll value
+              // Last roll value chip
               if (roll != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: roll.grantsExtraTurn
-                        ? DesignSystem.accent.withValues(alpha: 0.15)
-                        : DesignSystem.surfaceGlass,
+                    color:
+                        roll.grantsExtraTurn
+                            ? IstoColorsDark.accentPrimary.withValues(
+                              alpha: 0.15,
+                            )
+                            : Colors.white.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: roll.grantsExtraTurn
-                          ? DesignSystem.accent.withValues(alpha: 0.3)
-                          : Colors.white.withValues(alpha: 0.06),
+                      color:
+                          roll.grantsExtraTurn
+                              ? IstoColorsDark.accentPrimary.withValues(
+                                alpha: 0.3,
+                              )
+                              : Colors.white.withValues(alpha: 0.06),
                     ),
                   ),
                   child: Text(
                     '${roll.steps}',
-                    style: DesignSystem.bodyLarge.copyWith(
-                      color: roll.grantsExtraTurn
-                          ? DesignSystem.accent
-                          : DesignSystem.textPrimary,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
+                      color:
+                          roll.grantsExtraTurn
+                              ? IstoColorsDark.accentPrimary
+                              : IstoColorsDark.textPrimary,
                     ),
                   ),
                 ),
               ],
               const SizedBox(width: 8),
-              // Player pawns progress
               _buildPawnProgress(gm),
               const SizedBox(width: 8),
-              // Settings button
+              // Settings gear
               GestureDetector(
                 onTap: () => game.overlays.add('settings'),
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: DesignSystem.surfaceGlass,
+                    color: Colors.white.withValues(alpha: 0.06),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.06),
@@ -138,7 +156,7 @@ class TurnIndicatorOverlay extends StatelessWidget {
                   ),
                   child: Icon(
                     Icons.settings_outlined,
-                    color: DesignSystem.textMuted,
+                    color: IstoColorsDark.textMuted,
                     size: 18,
                   ),
                 ),
@@ -164,11 +182,12 @@ class TurnIndicatorOverlay extends StatelessWidget {
           height: 8,
           margin: const EdgeInsets.symmetric(horizontal: 1),
           decoration: BoxDecoration(
-            color: isFinished
-                ? DesignSystem.success
-                : isActive
+            color:
+                isFinished
+                    ? IstoColorsDark.success
+                    : isActive
                     ? ThemeConfig.getPlayerColor(playerId)
-                    : DesignSystem.textMuted.withValues(alpha: 0.3),
+                    : IstoColorsDark.textMuted.withValues(alpha: 0.3),
             shape: BoxShape.circle,
           ),
         );

@@ -1,8 +1,10 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'config/design_system.dart';
+import 'theme/isto_tokens.dart';
 import 'game/isto_game.dart';
 import 'overlays/overlays.dart';
 import 'services/feedback_service.dart';
@@ -19,10 +21,18 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Hide system UI for immersive experience
+  // Set system UI to match bg-primary (Terracotta Dusk)
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.edgeToEdge,
     overlays: [SystemUiOverlay.top],
+  );
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: IstoColorsDark.bgPrimary,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
   );
 
   runApp(const ISTOApp());
@@ -34,15 +44,19 @@ class ISTOApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ISTO - Chauka Bara',
+      title: 'ISTO - Chowka Bara',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4ECCA3),
-          brightness: Brightness.dark,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: IstoColorsDark.bgPrimary,
+        colorScheme: ColorScheme.dark(
+          primary: IstoColorsDark.accentPrimary,
+          secondary: IstoColorsDark.accentWarm,
+          surface: IstoColorsDark.bgSurface,
+          error: IstoColorsDark.danger,
         ),
-        fontFamily: 'Inter',
+        textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
       ),
       home: const SplashWrapper(),
     );
@@ -97,75 +111,82 @@ class _GameScreenState extends State<GameScreen> {
       body: GameWidget<ISTOGame>(
         game: game,
         overlayBuilderMap: {
-          ISTOGame.rollButtonOverlay: (context, game) =>
-              RollButtonOverlay(game: game),
-          ISTOGame.turnIndicatorOverlay: (context, game) =>
-              TurnIndicatorOverlay(game: game),
+          ISTOGame.rollButtonOverlay:
+              (context, game) => RollButtonOverlay(game: game),
+          ISTOGame.turnIndicatorOverlay:
+              (context, game) => TurnIndicatorOverlay(game: game),
           ISTOGame.winOverlay: (context, game) => WinOverlay(game: game),
           ISTOGame.menuOverlay: (context, game) => MenuOverlay(game: game),
-          ISTOGame.stackedPawnDialogOverlay: (context, game) => StackedPawnDialog(
-            game: game,
-            stackedPawns: game.pendingStackedPawns ?? [],
-            rollValue: game.currentRollValue,
-            onChoice: (pawnCount) => game.onStackedPawnChoice(pawnCount),
-          ),
+          ISTOGame.stackedPawnDialogOverlay:
+              (context, game) => StackedPawnDialog(
+                game: game,
+                stackedPawns: game.pendingStackedPawns ?? [],
+                rollValue: game.currentRollValue,
+                onChoice: (pawnCount) => game.onStackedPawnChoice(pawnCount),
+              ),
           'extraTurn': (context, game) => ExtraTurnOverlay(game: game),
           'capture': (context, game) => CaptureOverlay(game: game),
           'noMoves': (context, game) => NoMovesOverlay(game: game),
           'settings': (context, game) => SettingsOverlay(game: game),
         },
-        loadingBuilder: (context) => Container(
-          decoration: const BoxDecoration(gradient: DesignSystem.bgGradient),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  color: DesignSystem.accent,
-                  strokeWidth: 2,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Loading...',
-                  style: DesignSystem.bodyMedium.copyWith(
-                    color: DesignSystem.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        errorBuilder: (context, error) => Container(
-          decoration: const BoxDecoration(gradient: DesignSystem.bgGradient),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: DesignSystem.textMuted,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Something went wrong',
-                    style: DesignSystem.headingSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    error.toString(),
-                    style: DesignSystem.caption.copyWith(
-                      color: DesignSystem.textMuted,
+        loadingBuilder:
+            (context) => Container(
+              decoration: const BoxDecoration(
+                gradient: DesignSystem.bgGradient,
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: DesignSystem.accent,
+                      strokeWidth: 2,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    Text(
+                      'Loading...',
+                      style: DesignSystem.bodyMedium.copyWith(
+                        color: DesignSystem.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+        errorBuilder:
+            (context, error) => Container(
+              decoration: const BoxDecoration(
+                gradient: DesignSystem.bgGradient,
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: DesignSystem.textMuted,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Something went wrong',
+                        style: DesignSystem.headingSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        error.toString(),
+                        style: DesignSystem.caption.copyWith(
+                          color: DesignSystem.textMuted,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       ),
     );
   }

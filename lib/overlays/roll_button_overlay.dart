@@ -1,11 +1,14 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/design_system.dart';
 import '../game/isto_game.dart';
+import '../theme/isto_tokens.dart';
 
-/// Gold gradient roll button with breathing pulse and press feedback
+/// Gold gradient roll button with breathing pulse and press feedback.
+/// Terracotta Dusk styled — warm gold gradient, mini cowry shell icons.
 class RollButtonOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -69,14 +72,14 @@ class _RollButtonOverlayState extends State<RollButtonOverlay>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Mini cowry icons
+                  // Mini cowry shell dots
                   ...List.generate(4, (i) {
                     return Container(
                       width: 10,
                       height: 6,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A0E04).withValues(alpha: 0.5),
+                        color: IstoColorsDark.bgPrimary.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     );
@@ -84,8 +87,10 @@ class _RollButtonOverlayState extends State<RollButtonOverlay>
                   const SizedBox(width: 12),
                   Text(
                     'ROLL',
-                    style: DesignSystem.buttonText.copyWith(
+                    style: GoogleFonts.poppins(
                       fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: IstoColorsDark.bgPrimary,
                       letterSpacing: 3,
                     ),
                   ),

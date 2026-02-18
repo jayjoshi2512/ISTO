@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/design_system.dart';
 import '../config/theme_config.dart';
 import '../game/isto_game.dart';
 import '../models/models.dart';
+import '../theme/isto_tokens.dart';
 
-/// Dialog for choosing how many stacked pawns to move together
+/// Dialog for choosing how many stacked pawns to move together.
+/// Terracotta Dusk palette, GoogleFonts Poppins.
 class StackedPawnDialog extends StatefulWidget {
   final ISTOGame game;
   final List<Pawn> stackedPawns;
@@ -38,9 +41,10 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
       duration: const Duration(milliseconds: 400),
     );
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
+    _scale = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
     _ctrl.forward();
   }
 
@@ -84,9 +88,7 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
             onTap: () {}, // block taps
             child: FadeTransition(
               opacity: _fade,
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-              ),
+              child: Container(color: Colors.black.withValues(alpha: 0.5)),
             ),
           ),
 
@@ -99,11 +101,27 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 40),
                   padding: const EdgeInsets.all(24),
-                  decoration: DesignSystem.glassCard.copyWith(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        IstoColorsDark.bgElevated.withValues(alpha: 0.96),
+                        IstoColorsDark.bgSurface.withValues(alpha: 0.96),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(IstoRadius.lg),
                     border: Border.all(
                       color: playerColor.withValues(alpha: 0.3),
                       width: 1,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -112,13 +130,18 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.people_alt_rounded,
-                              color: playerColor, size: 24),
+                          Icon(
+                            Icons.people_alt_rounded,
+                            color: playerColor,
+                            size: 24,
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             'Stacked Pawns',
-                            style: DesignSystem.headingSmall.copyWith(
-                              color: DesignSystem.textPrimary,
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: IstoColorsDark.textPrimary,
                             ),
                           ),
                         ],
@@ -127,8 +150,9 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
 
                       Text(
                         '${widget.stackedPawns.length} pawns on this square\nRoll: ${widget.rollValue}',
-                        style: DesignSystem.bodySmall.copyWith(
-                          color: DesignSystem.textSecondary,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: IstoColorsDark.textSecondary,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -139,9 +163,10 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
 
                       Text(
                         'How many pawns to move?',
-                        style: DesignSystem.bodyMedium.copyWith(
-                          color: DesignSystem.textPrimary,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
+                          color: IstoColorsDark.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -151,72 +176,80 @@ class _StackedPawnDialogState extends State<StackedPawnDialog>
                         spacing: 12,
                         runSpacing: 12,
                         alignment: WrapAlignment.center,
-                        children: counts.map((count) {
-                          final stepsEach = widget.rollValue ~/ count;
-                          return GestureDetector(
-                            onTap: () => widget.onChoice(count),
-                            child: Container(
-                              width: 90,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    playerColor.withValues(alpha: 0.15),
-                                    playerColor.withValues(alpha: 0.08),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                    DesignSystem.radiusMd),
-                                border: Border.all(
-                                  color: playerColor.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  // Pawn dots
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: List.generate(count, (_) {
-                                      return Container(
-                                        width: 10,
-                                        height: 10,
-                                        margin: const EdgeInsets.symmetric(
-                                            horizontal: 2),
-                                        decoration: BoxDecoration(
-                                          color: playerColor,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: playerColor
-                                                  .withValues(alpha: 0.5),
-                                              blurRadius: 4,
+                        children:
+                            counts.map((count) {
+                              final stepsEach = widget.rollValue ~/ count;
+                              return GestureDetector(
+                                onTap: () => widget.onChoice(count),
+                                child: Container(
+                                  width: 90,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        playerColor.withValues(alpha: 0.15),
+                                        playerColor.withValues(alpha: 0.08),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      IstoRadius.md,
+                                    ),
+                                    border: Border.all(
+                                      color: playerColor.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Pawn dots
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: List.generate(count, (_) {
+                                          return Container(
+                                            width: 10,
+                                            height: 10,
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: 2,
                                             ),
-                                          ],
+                                            decoration: BoxDecoration(
+                                              color: playerColor,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: playerColor.withValues(
+                                                    alpha: 0.5,
+                                                  ),
+                                                  blurRadius: 4,
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        '$count pawn${count > 1 ? 's' : ''}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: IstoColorsDark.textPrimary,
                                         ),
-                                      );
-                                    }),
+                                      ),
+                                      Text(
+                                        '$stepsEach step${stepsEach > 1 ? 's' : ''} each',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 10,
+                                          color: IstoColorsDark.textMuted,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '$count pawn${count > 1 ? 's' : ''}',
-                                    style: DesignSystem.caption.copyWith(
-                                      color: DesignSystem.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    '$stepsEach step${stepsEach > 1 ? 's' : ''} each',
-                                    style: DesignSystem.caption.copyWith(
-                                      color: DesignSystem.textMuted,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ],
                   ),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/design_system.dart';
 import '../game/isto_game.dart';
 import '../services/feedback_service.dart';
+import '../theme/isto_tokens.dart';
 
-/// Settings overlay with sound/haptics toggles and game options
+/// Settings overlay — glass card with toggles and actions.
+/// Terracotta Dusk palette, GoogleFonts Poppins.
 class SettingsOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -28,9 +31,10 @@ class _SettingsOverlayState extends State<SettingsOverlay>
       duration: const Duration(milliseconds: 300),
     );
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
+    _scale = Tween<double>(
+      begin: 0.9,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
     _ctrl.forward();
   }
 
@@ -54,14 +58,12 @@ class _SettingsOverlayState extends State<SettingsOverlay>
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Backdrop
+          // Dark backdrop
           GestureDetector(
             onTap: _close,
             child: FadeTransition(
               opacity: _fade,
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-              ),
+              child: Container(color: Colors.black.withValues(alpha: 0.5)),
             ),
           ),
 
@@ -74,7 +76,28 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 32),
                   padding: const EdgeInsets.all(24),
-                  decoration: DesignSystem.glassCard,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        IstoColorsDark.bgElevated.withValues(alpha: 0.96),
+                        IstoColorsDark.bgSurface.withValues(alpha: 0.96),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(IstoRadius.lg),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -84,19 +107,23 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                         children: [
                           Text(
                             'Settings',
-                            style: DesignSystem.headingMedium,
+                            style: GoogleFonts.poppins(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: IstoColorsDark.textPrimary,
+                            ),
                           ),
                           GestureDetector(
                             onTap: _close,
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: DesignSystem.surfaceGlass,
+                                color: Colors.white.withValues(alpha: 0.06),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 Icons.close_rounded,
-                                color: DesignSystem.textMuted,
+                                color: IstoColorsDark.textMuted,
                                 size: 20,
                               ),
                             ),
@@ -109,9 +136,10 @@ class _SettingsOverlayState extends State<SettingsOverlay>
 
                       // Sound toggle
                       _SettingsTile(
-                        icon: feedbackService.soundEnabled
-                            ? Icons.volume_up_rounded
-                            : Icons.volume_off_rounded,
+                        icon:
+                            feedbackService.soundEnabled
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_off_rounded,
                         label: 'Sound Effects',
                         value: feedbackService.soundEnabled,
                         onChanged: (v) {
@@ -125,9 +153,10 @@ class _SettingsOverlayState extends State<SettingsOverlay>
 
                       // Haptics toggle
                       _SettingsTile(
-                        icon: feedbackService.hapticsEnabled
-                            ? Icons.vibration
-                            : Icons.do_not_disturb_on_rounded,
+                        icon:
+                            feedbackService.hapticsEnabled
+                                ? Icons.vibration
+                                : Icons.do_not_disturb_on_rounded,
                         label: 'Haptic Feedback',
                         value: feedbackService.hapticsEnabled,
                         onChanged: (v) {
@@ -145,7 +174,7 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                       _ActionTile(
                         icon: Icons.restart_alt_rounded,
                         label: 'Restart Game',
-                        color: DesignSystem.warning,
+                        color: IstoColorsDark.accentWarm,
                         onTap: () {
                           _close();
                           widget.game.gameManager.reset();
@@ -155,13 +184,15 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                       _ActionTile(
                         icon: Icons.home_rounded,
                         label: 'Back to Menu',
-                        color: DesignSystem.textSecondary,
+                        color: IstoColorsDark.textSecondary,
                         onTap: () {
                           _close();
-                          widget.game.overlays
-                              .remove(ISTOGame.turnIndicatorOverlay);
-                          widget.game.overlays
-                              .remove(ISTOGame.rollButtonOverlay);
+                          widget.game.overlays.remove(
+                            ISTOGame.turnIndicatorOverlay,
+                          );
+                          widget.game.overlays.remove(
+                            ISTOGame.rollButtonOverlay,
+                          );
                           widget.game.showMenu();
                         },
                       ),
@@ -195,21 +226,21 @@ class _SettingsTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: DesignSystem.surfaceGlass,
-        borderRadius: BorderRadius.circular(DesignSystem.radiusMd),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-        ),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(IstoRadius.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: DesignSystem.textSecondary, size: 22),
+          Icon(icon, color: IstoColorsDark.textSecondary, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               label,
-              style: DesignSystem.bodyMedium.copyWith(
-                color: DesignSystem.textPrimary,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: IstoColorsDark.textPrimary,
               ),
             ),
           ),
@@ -220,36 +251,42 @@ class _SettingsTile extends StatelessWidget {
               width: 46,
               height: 26,
               decoration: BoxDecoration(
-                color: value
-                    ? DesignSystem.accent.withValues(alpha: 0.3)
-                    : DesignSystem.surface,
+                color:
+                    value
+                        ? IstoColorsDark.accentPrimary.withValues(alpha: 0.3)
+                        : IstoColorsDark.bgSurface,
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(
-                  color: value
-                      ? DesignSystem.accent.withValues(alpha: 0.5)
-                      : DesignSystem.textMuted.withValues(alpha: 0.3),
+                  color:
+                      value
+                          ? IstoColorsDark.accentPrimary.withValues(alpha: 0.5)
+                          : IstoColorsDark.textMuted.withValues(alpha: 0.3),
                 ),
               ),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 200),
-                alignment:
-                    value ? Alignment.centerRight : Alignment.centerLeft,
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   width: 20,
                   height: 20,
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
-                    color: value ? DesignSystem.accent : DesignSystem.textMuted,
+                    color:
+                        value
+                            ? IstoColorsDark.accentPrimary
+                            : IstoColorsDark.textMuted,
                     shape: BoxShape.circle,
-                    boxShadow: value
-                        ? [
-                            BoxShadow(
-                              color: DesignSystem.accent
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 6,
-                            ),
-                          ]
-                        : null,
+                    boxShadow:
+                        value
+                            ? [
+                              BoxShadow(
+                                color: IstoColorsDark.accentPrimary.withValues(
+                                  alpha: 0.4,
+                                ),
+                                blurRadius: 6,
+                              ),
+                            ]
+                            : null,
                   ),
                 ),
               ),
@@ -282,10 +319,8 @@ class _ActionTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(DesignSystem.radiusMd),
-          border: Border.all(
-            color: color.withValues(alpha: 0.15),
-          ),
+          borderRadius: BorderRadius.circular(IstoRadius.md),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
         ),
         child: Row(
           children: [
@@ -293,11 +328,14 @@ class _ActionTile extends StatelessWidget {
             const SizedBox(width: 14),
             Text(
               label,
-              style: DesignSystem.bodyMedium.copyWith(
-                color: color,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
+                color: color,
               ),
             ),
+            const Spacer(),
+            Icon(Icons.chevron_right_rounded, color: color, size: 20),
           ],
         ),
       ),

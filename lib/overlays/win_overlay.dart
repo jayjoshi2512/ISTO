@@ -1,11 +1,13 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/design_system.dart';
 import '../game/isto_game.dart';
+import '../theme/isto_tokens.dart';
 
-/// Victory overlay with celebration effects and rankings
+/// Victory overlay — celebration effects, rankings, Lora title.
 class WinOverlay extends StatefulWidget {
   final ISTOGame game;
 
@@ -15,8 +17,7 @@ class WinOverlay extends StatefulWidget {
   State<WinOverlay> createState() => _WinOverlayState();
 }
 
-class _WinOverlayState extends State<WinOverlay>
-    with TickerProviderStateMixin {
+class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
   late AnimationController _entranceCtrl;
   late AnimationController _confettiCtrl;
   late Animation<double> _fadeIn;
@@ -32,30 +33,32 @@ class _WinOverlayState extends State<WinOverlay>
       duration: const Duration(milliseconds: 800),
     );
     _fadeIn = CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut);
-    _scaleIn = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _entranceCtrl, curve: Curves.elasticOut),
-    );
+    _scaleIn = Tween<double>(
+      begin: 0.7,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _entranceCtrl, curve: Curves.elasticOut));
 
     _confettiCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
 
-    // Generate confetti
+    // Confetti particles in player palette + gold
     final rng = Random();
     _confetti = List.generate(50, (_) {
       return _ConfettiParticle(
         x: rng.nextDouble(),
         speed: 0.2 + rng.nextDouble() * 0.6,
         size: 4 + rng.nextDouble() * 8,
-        color: [
-          DesignSystem.accent,
-          const Color(0xFFFF6B6B),
-          const Color(0xFF4ECDC4),
-          const Color(0xFFFFE66D),
-          const Color(0xFFA8E6CF),
-          const Color(0xFFFF8A80),
-        ][rng.nextInt(6)],
+        color:
+            [
+              IstoColorsDark.accentPrimary,
+              IstoPlayerColors.base(0), // Crimson
+              IstoPlayerColors.base(1), // Cobalt
+              IstoPlayerColors.base(2), // Forest
+              IstoColorsDark.accentGlow,
+              IstoColorsDark.accentWarm,
+            ][rng.nextInt(6)],
         wobble: rng.nextDouble() * pi * 2,
         wobbleSpeed: 1 + rng.nextDouble() * 3,
       );
@@ -84,9 +87,7 @@ class _WinOverlayState extends State<WinOverlay>
           // Dark backdrop
           FadeTransition(
             opacity: _fadeIn,
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.75),
-            ),
+            child: Container(color: Colors.black.withValues(alpha: 0.75)),
           ),
 
           // Confetti layer
@@ -103,7 +104,7 @@ class _WinOverlayState extends State<WinOverlay>
             },
           ),
 
-          // Content
+          // Content card
           Center(
             child: FadeTransition(
               opacity: _fadeIn,
@@ -112,13 +113,32 @@ class _WinOverlayState extends State<WinOverlay>
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 32),
                   padding: const EdgeInsets.all(28),
-                  decoration: DesignSystem.glassCard.copyWith(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        IstoColorsDark.bgElevated.withValues(alpha: 0.95),
+                        IstoColorsDark.bgSurface.withValues(alpha: 0.95),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(IstoRadius.lg),
                     border: Border.all(
-                      color: winner != null
-                          ? winner.color.withValues(alpha: 0.3)
-                          : DesignSystem.accent.withValues(alpha: 0.3),
+                      color:
+                          winner != null
+                              ? winner.color.withValues(alpha: 0.3)
+                              : IstoColorsDark.accentPrimary.withValues(
+                                alpha: 0.3,
+                              ),
                       width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -128,27 +148,39 @@ class _WinOverlayState extends State<WinOverlay>
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          gradient: DesignSystem.goldGradient,
+                          gradient: IstoGradients.accentGold,
                           shape: BoxShape.circle,
-                          boxShadow: DesignSystem.glowShadow,
+                          boxShadow: [
+                            BoxShadow(
+                              color: IstoColorsDark.accentPrimary.withValues(
+                                alpha: 0.4,
+                              ),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.emoji_events_rounded,
-                          color: Color(0xFF1A0E04),
+                          color: IstoColorsDark.bgPrimary,
                           size: 32,
                         ),
                       ),
                       const SizedBox(height: 20),
 
-                      // Victory text
-                      Text(
-                        'VICTORY!',
-                        style: DesignSystem.headingLarge.copyWith(
-                          letterSpacing: 4,
-                          foreground: Paint()
-                            ..shader = DesignSystem.goldGradient
-                                .createShader(
-                                    const Rect.fromLTWH(0, 0, 200, 40)),
+                      // "VICTORY!" in Lora with gold gradient
+                      ShaderMask(
+                        shaderCallback:
+                            (bounds) =>
+                                IstoGradients.accentGold.createShader(bounds),
+                        child: Text(
+                          'VICTORY!',
+                          style: GoogleFonts.lora(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 4,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -156,9 +188,10 @@ class _WinOverlayState extends State<WinOverlay>
                       if (winner != null) ...[
                         Text(
                           '${winner.name} wins!',
-                          style: DesignSystem.bodyLarge.copyWith(
-                            color: winner.color,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
+                            color: winner.color,
                           ),
                         ),
                       ],
@@ -167,7 +200,7 @@ class _WinOverlayState extends State<WinOverlay>
                       const MinimalDivider(),
                       const SizedBox(height: 20),
 
-                      // Rankings list
+                      // Rankings
                       ...rankings.asMap().entries.map((entry) {
                         final index = entry.key;
                         final player = entry.value;
@@ -180,7 +213,7 @@ class _WinOverlayState extends State<WinOverlay>
                                 width: 32,
                                 child: Text(
                                   index < 3 ? medals[index] : medals[3],
-                                  style: DesignSystem.bodyLarge,
+                                  style: const TextStyle(fontSize: 16),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -197,13 +230,16 @@ class _WinOverlayState extends State<WinOverlay>
                               Expanded(
                                 child: Text(
                                   player.name,
-                                  style: DesignSystem.bodyMedium.copyWith(
-                                    color: index == 0
-                                        ? DesignSystem.textPrimary
-                                        : DesignSystem.textSecondary,
-                                    fontWeight: index == 0
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color:
+                                        index == 0
+                                            ? IstoColorsDark.textPrimary
+                                            : IstoColorsDark.textSecondary,
+                                    fontWeight:
+                                        index == 0
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
                                   ),
                                 ),
                               ),
@@ -222,14 +258,19 @@ class _WinOverlayState extends State<WinOverlay>
                               label: 'PLAY AGAIN',
                               onTap: () {
                                 widget.game.gameManager.reset();
-                                widget.game.overlays
-                                    .remove(ISTOGame.winOverlay);
-                                widget.game.overlays
-                                    .add(ISTOGame.turnIndicatorOverlay);
-                                if (!widget.game.gameManager
+                                widget.game.overlays.remove(
+                                  ISTOGame.winOverlay,
+                                );
+                                widget.game.overlays.add(
+                                  ISTOGame.turnIndicatorOverlay,
+                                );
+                                if (!widget
+                                    .game
+                                    .gameManager
                                     .isCurrentPlayerAI) {
-                                  widget.game.overlays
-                                      .add(ISTOGame.rollButtonOverlay);
+                                  widget.game.overlays.add(
+                                    ISTOGame.rollButtonOverlay,
+                                  );
                                 }
                               },
                               icon: Icons.replay_rounded,
@@ -240,12 +281,15 @@ class _WinOverlayState extends State<WinOverlay>
                             child: PremiumButton(
                               label: 'MENU',
                               onTap: () {
-                                widget.game.overlays
-                                    .remove(ISTOGame.winOverlay);
-                                widget.game.overlays
-                                    .remove(ISTOGame.turnIndicatorOverlay);
-                                widget.game.overlays
-                                    .remove(ISTOGame.rollButtonOverlay);
+                                widget.game.overlays.remove(
+                                  ISTOGame.winOverlay,
+                                );
+                                widget.game.overlays.remove(
+                                  ISTOGame.turnIndicatorOverlay,
+                                );
+                                widget.game.overlays.remove(
+                                  ISTOGame.rollButtonOverlay,
+                                );
                                 widget.game.showMenu();
                               },
                               isPrimary: false,

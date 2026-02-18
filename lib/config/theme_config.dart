@@ -1,33 +1,35 @@
 import 'dart:ui';
 
+import '../theme/isto_tokens.dart';
 import 'player_colors.dart';
 
 /// Theme configuration — colors, sizes, and player theming
+/// All colors derived from IstoColorsDark (Terracotta Dusk) tokens.
 class ThemeConfig {
   // ======= BOARD COLORS =======
-  static const Color boardBackground = Color(0xFF1A0F06);  // Deep mahogany  
-  static const Color boardBorder = Color(0xFF3D2B18);       // Wood frame
-  static const Color outerSquare = Color(0xFF28180A);       // Dark teak
-  static const Color outerSquareBorder = Color(0xFF4D3620);  // Bronze border
-  static const Color innerSquare = Color(0xFF382412);       // Rich walnut
-  static const Color innerSquareBorder = Color(0xFF5E4430); // Warm bronze
-  static const Color centerSquare = Color(0xFFF2C94C);      // Antique gold
-  static const Color centerSquareGlow = Color(0x50F2C94C);  // Gold glow
-  static const Color safeSquareMark = Color(0x70F2C94C);    // Gold X marks
+  static const Color boardBackground = IstoColorsDark.bgSurface;
+  static const Color boardBorder = IstoColorsDark.boardLine;
+  static const Color outerSquare = IstoColorsDark.boardCell;
+  static const Color outerSquareBorder = IstoColorsDark.boardLine;
+  static const Color innerSquare = IstoColorsDark.boardCellAlt;
+  static const Color innerSquareBorder = IstoColorsDark.boardLine;
+  static const Color centerSquare = IstoColorsDark.accentGlow;
+  static const Color centerSquareGlow = IstoColorsDark.centerHomeGlow;
+  static const Color safeSquareMark = IstoColorsDark.safeSquareBorder;
 
   // ======= COWRY COLORS =======
-  static const Color cowryUp = Color(0xFFF5EDDB);           // Ivory mouth-up
-  static const Color cowryDown = Color(0xFF8B7050);          // Brown shell back
-  static const Color cowryBorder = Color(0xFF6B5840);        // Shell edge
+  static const Color cowryUp = Color(0xFFF5F0E0); // Ivory mouth-up
+  static const Color cowryDown = Color(0xFFA08060); // Brown shell back
+  static const Color cowryBorder = Color(0xFF5A4830); // Shell edge
 
   // ======= UI COLORS =======
-  static const Color textPrimary = Color(0xFFF0E6D2);
-  static const Color textSecondary = Color(0xFFC4AE92);
-  static const Color textMuted = Color(0xFF786858);
-  static const Color goldAccent = Color(0xFFF2C94C);
-  static const Color goldDark = Color(0xFFAA8A2E);
-  static const Color dangerRed = Color(0xFFE74C3C);
-  static const Color successGreen = Color(0xFF2ECC71);
+  static const Color textPrimary = IstoColorsDark.textPrimary;
+  static const Color textSecondary = IstoColorsDark.textSecondary;
+  static const Color textMuted = IstoColorsDark.textMuted;
+  static const Color goldAccent = IstoColorsDark.accentPrimary;
+  static const Color goldDark = Color(0xFF8A6020);
+  static const Color dangerRed = IstoColorsDark.danger;
+  static const Color successGreen = IstoColorsDark.success;
 
   // ======= SIZES =======
   static const double squareSize = 56.0;
