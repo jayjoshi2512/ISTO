@@ -1,14 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isto_game/models/models.dart';
+import 'package:isto/models/models.dart';
 
 void main() {
   group('Pawn', () {
     test('creates pawn with correct initial state', () {
-      final pawn = Pawn(
-        id: 'P0_0',
-        playerId: 0,
-        pawnIndex: 0,
-      );
+      final pawn = Pawn(id: 'P0_0', playerId: 0, pawnIndex: 0);
 
       expect(pawn.id, 'P0_0');
       expect(pawn.playerId, 0);
@@ -22,11 +18,7 @@ void main() {
     });
 
     test('enterBoard changes state correctly', () {
-      final pawn = Pawn(
-        id: 'P0_0',
-        playerId: 0,
-        pawnIndex: 0,
-      );
+      final pawn = Pawn(id: 'P0_0', playerId: 0, pawnIndex: 0);
 
       pawn.enterBoard();
 

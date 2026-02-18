@@ -170,6 +170,17 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                       const MinimalDivider(),
                       const SizedBox(height: 16),
 
+                      // How to Play
+                      _ActionTile(
+                        icon: Icons.menu_book_rounded,
+                        label: 'How to Play',
+                        color: IstoColorsDark.accentPrimary,
+                        onTap: () {
+                          widget.game.overlays.add('howToPlay');
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
                       // Game actions
                       _ActionTile(
                         icon: Icons.restart_alt_rounded,
@@ -189,9 +200,6 @@ class _SettingsOverlayState extends State<SettingsOverlay>
                           _close();
                           widget.game.overlays.remove(
                             ISTOGame.turnIndicatorOverlay,
-                          );
-                          widget.game.overlays.remove(
-                            ISTOGame.rollButtonOverlay,
                           );
                           widget.game.showMenu();
                         },

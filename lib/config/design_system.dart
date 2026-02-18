@@ -269,7 +269,7 @@ class _PremiumButtonState extends State<PremiumButton>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
           width: widget.width,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration:
               widget.isPrimary
                   ? DesignSystem.goldButton(pressed: _pressed)
@@ -292,23 +292,28 @@ class _PremiumButtonState extends State<PremiumButton>
               if (widget.icon != null) ...[
                 Icon(
                   widget.icon,
-                  size: 20,
+                  size: 18,
                   color:
                       widget.isPrimary
                           ? const Color(0xFF1A0E04)
                           : DesignSystem.textPrimary,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
               ],
-              Text(
-                widget.label,
-                style:
-                    widget.isPrimary
-                        ? DesignSystem.buttonText
-                        : DesignSystem.bodyLarge.copyWith(
-                          color: DesignSystem.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
+              Flexible(
+                child: Text(
+                  widget.label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style:
+                      widget.isPrimary
+                          ? DesignSystem.buttonText.copyWith(fontSize: 13)
+                          : DesignSystem.bodyLarge.copyWith(
+                            color: DesignSystem.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                ),
               ),
             ],
           ),

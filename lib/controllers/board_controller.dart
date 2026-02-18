@@ -13,10 +13,10 @@ class BoardController {
 
   void _initPlayerPaths() {
     playerPaths = {
-      0: BoardConfig.player0Path,
-      1: BoardConfig.player1Path,
-      2: BoardConfig.player2Path,
-      3: BoardConfig.player3Path,
+      0: BoardConfig.getPlayerPath(0),
+      1: BoardConfig.getPlayerPath(1),
+      2: BoardConfig.getPlayerPath(2),
+      3: BoardConfig.getPlayerPath(3),
     };
   }
 
@@ -25,10 +25,7 @@ class BoardController {
       for (int c = 0; c < BoardConfig.boardSize; c++) {
         if (BoardConfig.isValidSquare(r, c)) {
           final pos = Position(r, c);
-          squares[pos.id] = Square(
-            position: pos,
-            type: _getSquareType(r, c),
-          );
+          squares[pos.id] = Square(position: pos, type: _getSquareType(r, c));
         }
       }
     }
@@ -89,7 +86,13 @@ class BoardController {
 
   /// Get all pawns that can make a valid move
   /// hasCaptured: whether this player has made at least one capture (for inner ring entry)
-  List<Pawn> getValidMoves(int playerId, int steps, List<Pawn> allPawns, bool allowsEntry, [bool hasCaptured = true]) {
+  List<Pawn> getValidMoves(
+    int playerId,
+    int steps,
+    List<Pawn> allPawns,
+    bool allowsEntry, [
+    bool hasCaptured = true,
+  ]) {
     final playerPawns = allPawns.where((p) => p.playerId == playerId).toList();
     final validPawns = <Pawn>[];
 
@@ -104,7 +107,13 @@ class BoardController {
 
   /// Check if a specific pawn can move
   /// hasCaptured: whether this player has made at least one capture (for inner ring entry)
-  bool canPawnMove(Pawn pawn, int steps, List<Pawn> allPawns, bool allowsEntry, [bool hasCaptured = true]) {
+  bool canPawnMove(
+    Pawn pawn,
+    int steps,
+    List<Pawn> allPawns,
+    bool allowsEntry, [
+    bool hasCaptured = true,
+  ]) {
     // Finished pawns can't move
     if (pawn.isFinished) return false;
 
@@ -119,11 +128,12 @@ class BoardController {
 
     // Can't exceed path (must land exactly on center)
     if (newIndex > pathLength - 1) return false;
-    
+
     // Check if move would enter inner ring
     final destPos = playerPaths[pawn.playerId]![newIndex];
-    final wouldEnterInner = BoardConfig.isInnerPath(destPos) || BoardConfig.isCenter(destPos);
-    
+    final wouldEnterInner =
+        BoardConfig.isInnerPath(destPos) || BoardConfig.isCenter(destPos);
+
     // ISTO RULE: Must capture at least one opponent before entering inner ring
     if (wouldEnterInner && !hasCaptured) {
       // Check if pawn is currently on outer path
@@ -142,7 +152,7 @@ class BoardController {
       // ISTO RULE: Can stack multiple pawns on SAFE squares (starting positions)
       final destPos = playerPaths[pawn.playerId]![newIndex];
       final isSafe = BoardConfig.isSafeSquare(destPos);
-      
+
       if (!isSafe) {
         // Non-safe outer path: can't land on own pawn
         final friendlyPawns = destSquare.getFriendlyPawns(pawn.playerId);

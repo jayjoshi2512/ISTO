@@ -110,195 +110,188 @@ class _WinOverlayState extends State<WinOverlay> with TickerProviderStateMixin {
               opacity: _fadeIn,
               child: ScaleTransition(
                 scale: _scaleIn,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        IstoColorsDark.bgElevated.withValues(alpha: 0.95),
-                        IstoColorsDark.bgSurface.withValues(alpha: 0.95),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: screen.height * 0.78),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          IstoColorsDark.bgElevated.withValues(alpha: 0.95),
+                          IstoColorsDark.bgSurface.withValues(alpha: 0.95),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(IstoRadius.lg),
+                      border: Border.all(
+                        color:
+                            winner != null
+                                ? winner.color.withValues(alpha: 0.3)
+                                : IstoColorsDark.accentPrimary.withValues(
+                                  alpha: 0.3,
+                                ),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(IstoRadius.lg),
-                    border: Border.all(
-                      color:
-                          winner != null
-                              ? winner.color.withValues(alpha: 0.3)
-                              : IstoColorsDark.accentPrimary.withValues(
-                                alpha: 0.3,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Trophy icon
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              gradient: IstoGradients.accentGold,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: IstoColorsDark.accentPrimary
+                                      .withValues(alpha: 0.4),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.emoji_events_rounded,
+                              color: IstoColorsDark.bgPrimary,
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // "VICTORY!" in Lora with gold gradient
+                          ShaderMask(
+                            shaderCallback:
+                                (bounds) => IstoGradients.accentGold
+                                    .createShader(bounds),
+                            child: Text(
+                              'VICTORY!',
+                              style: GoogleFonts.lora(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 4,
                               ),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Trophy icon
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          gradient: IstoGradients.accentGold,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: IstoColorsDark.accentPrimary.withValues(
-                                alpha: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          if (winner != null) ...[
+                            Text(
+                              '${winner.name} wins!',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: winner.color,
                               ),
-                              blurRadius: 20,
-                              spreadRadius: 2,
                             ),
                           ],
-                        ),
-                        child: Icon(
-                          Icons.emoji_events_rounded,
-                          color: IstoColorsDark.bgPrimary,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
 
-                      // "VICTORY!" in Lora with gold gradient
-                      ShaderMask(
-                        shaderCallback:
-                            (bounds) =>
-                                IstoGradients.accentGold.createShader(bounds),
-                        child: Text(
-                          'VICTORY!',
-                          style: GoogleFonts.lora(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                          const SizedBox(height: 24),
+                          const MinimalDivider(),
+                          const SizedBox(height: 20),
 
-                      if (winner != null) ...[
-                        Text(
-                          '${winner.name} wins!',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: winner.color,
-                          ),
-                        ),
-                      ],
+                          // Rankings
+                          ...rankings.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final player = entry.value;
+                            final medals = ['🥇', '🥈', '🥉', '4th'];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 32,
+                                    child: Text(
+                                      index < 3 ? medals[index] : medals[3],
+                                      style: const TextStyle(fontSize: 16),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: player.color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      player.name,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        color:
+                                            index == 0
+                                                ? IstoColorsDark.textPrimary
+                                                : IstoColorsDark.textSecondary,
+                                        fontWeight:
+                                            index == 0
+                                                ? FontWeight.w700
+                                                : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
 
-                      const SizedBox(height: 24),
-                      const MinimalDivider(),
-                      const SizedBox(height: 20),
+                          const SizedBox(height: 28),
 
-                      // Rankings
-                      ...rankings.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final player = entry.value;
-                        final medals = ['🥇', '🥈', '🥉', '4th'];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
+                          // Buttons
+                          Row(
                             children: [
-                              SizedBox(
-                                width: 32,
-                                child: Text(
-                                  index < 3 ? medals[index] : medals[3],
-                                  style: const TextStyle(fontSize: 16),
-                                  textAlign: TextAlign.center,
+                              Expanded(
+                                child: PremiumButton(
+                                  label: 'PLAY AGAIN',
+                                  onTap: () {
+                                    widget.game.gameManager.reset();
+                                    widget.game.overlays.remove(
+                                      ISTOGame.winOverlay,
+                                    );
+                                    widget.game.overlays.add(
+                                      ISTOGame.turnIndicatorOverlay,
+                                    );
+                                  },
+                                  icon: Icons.replay_rounded,
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: player.color,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
                               Expanded(
-                                child: Text(
-                                  player.name,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    color:
-                                        index == 0
-                                            ? IstoColorsDark.textPrimary
-                                            : IstoColorsDark.textSecondary,
-                                    fontWeight:
-                                        index == 0
-                                            ? FontWeight.w700
-                                            : FontWeight.w400,
-                                  ),
+                                child: PremiumButton(
+                                  label: 'MENU',
+                                  onTap: () {
+                                    widget.game.overlays.remove(
+                                      ISTOGame.winOverlay,
+                                    );
+                                    widget.game.overlays.remove(
+                                      ISTOGame.turnIndicatorOverlay,
+                                    );
+                                    widget.game.showMenu();
+                                  },
+                                  isPrimary: false,
+                                  icon: Icons.home_rounded,
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }),
-
-                      const SizedBox(height: 28),
-
-                      // Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: PremiumButton(
-                              label: 'PLAY AGAIN',
-                              onTap: () {
-                                widget.game.gameManager.reset();
-                                widget.game.overlays.remove(
-                                  ISTOGame.winOverlay,
-                                );
-                                widget.game.overlays.add(
-                                  ISTOGame.turnIndicatorOverlay,
-                                );
-                                if (!widget
-                                    .game
-                                    .gameManager
-                                    .isCurrentPlayerAI) {
-                                  widget.game.overlays.add(
-                                    ISTOGame.rollButtonOverlay,
-                                  );
-                                }
-                              },
-                              icon: Icons.replay_rounded,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: PremiumButton(
-                              label: 'MENU',
-                              onTap: () {
-                                widget.game.overlays.remove(
-                                  ISTOGame.winOverlay,
-                                );
-                                widget.game.overlays.remove(
-                                  ISTOGame.turnIndicatorOverlay,
-                                );
-                                widget.game.overlays.remove(
-                                  ISTOGame.rollButtonOverlay,
-                                );
-                                widget.game.showMenu();
-                              },
-                              isPrimary: false,
-                              icon: Icons.home_rounded,
-                            ),
-                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

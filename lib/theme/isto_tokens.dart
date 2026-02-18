@@ -264,12 +264,12 @@ class IstoTypography {
 
   // ── Headings (Lora for cultural accents) ──
 
-  /// App title on splash — Lora 40sp 600
+  /// App title on splash — Lora 48sp 600
   static TextStyle get appTitle => const TextStyle(
-    fontSize: 40,
+    fontSize: 48,
     fontWeight: FontWeight.w600,
     color: IstoColorsDark.accentGlow,
-    letterSpacing: 2.5,
+    letterSpacing: 3.0,
     height: 1.1,
   );
 
@@ -333,12 +333,12 @@ class IstoTypography {
     letterSpacing: 2.0,
   );
 
-  /// Regional subtitle on splash — Poppins 12sp 400
+  /// Regional subtitle on splash — Poppins 16sp 400
   static TextStyle get subtitle => const TextStyle(
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: FontWeight.w400,
     color: IstoColorsDark.textMuted,
-    letterSpacing: 2.0,
+    letterSpacing: 2.5,
   );
 
   /// Victory message — Lora 36sp italic

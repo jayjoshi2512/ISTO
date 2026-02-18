@@ -184,11 +184,21 @@ class TurnIndicatorOverlay extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 isFinished
-                    ? IstoColorsDark.success
+                    ? IstoColorsDark
+                        .accentGlow // Gold for finished per spec §12
                     : isActive
                     ? ThemeConfig.getPlayerColor(playerId)
                     : IstoColorsDark.textMuted.withValues(alpha: 0.3),
             shape: BoxShape.circle,
+            boxShadow:
+                isFinished
+                    ? [
+                      BoxShadow(
+                        color: IstoColorsDark.accentGlow.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                      ),
+                    ]
+                    : null,
           ),
         );
       }),

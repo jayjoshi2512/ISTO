@@ -7,17 +7,19 @@ import '../theme/isto_tokens.dart';
 
 /// Splash screen — "The Cloth Mat Unrolls"
 ///
-/// Sequence (per design spec Section 4):
-/// 0ms:   Black screen
-/// 200ms: Faint grid pattern fades in
-/// 400ms: Center cell golden bloom radiates outward
+/// Enhanced sequence:
+/// 0ms:   Faint grid fades in
+/// 400ms: Center cell golden bloom radiates
 /// 600ms: Grid lines draw from center outward
-/// 900ms: Safe squares pulse
-/// 1100ms: "ISTO" title fades in + slide up
-/// 1600ms: Cowry shell icon drops and bounces
-/// 2200ms: Fade to Home Screen
-///
-/// UI only. No business logic touched.
+/// 900ms: Safe squares pulse with player color hints
+/// 1800ms: "ISTO" title fades in + slide up
+/// 2200ms: "Chowka Bara" subtitle
+/// 2600ms: Tagline appears letter-by-letter
+/// 3200ms: 4 cowry shells scatter from center with tumble + bounce
+/// 3800ms: Golden particle burst from center
+/// 4500ms: Floating golden dust sparkles
+/// 5500ms: Hold
+/// 6500ms: Fade out
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
@@ -31,6 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _masterCtrl;
   late AnimationController _exitCtrl;
+  late AnimationController _sparkleCtrl;
 
   // Phase animations derived from master timeline
   late Animation<double> _gridPatternOpacity;
@@ -40,62 +43,101 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _titleOpacity;
   late Animation<Offset> _titleSlide;
   late Animation<double> _subtitleOpacity;
-  late Animation<double> _cowryDrop;
-  late Animation<double> _cowryBounce;
+  late Animation<double> _taglineProgress; // 0→1 for letter-by-letter
+  late Animation<double> _cowryScatterProgress; // 0→1 for 4 shells scatter
+  late Animation<double> _particleBurst; // 0→1 for golden particles
+  late Animation<double> _dustFloat; // 0→1 for floating sparkles
+
+  // Pre-computed random data for 4 scattered cowries
+  final _rng = Random(42);
+  late final List<_CowryScatterData> _cowryData;
+  // Pre-computed sparkle positions (golden dust)
+  late final List<_SparkleData> _sparkles;
 
   @override
   void initState() {
     super.initState();
 
-    // Master timeline: 0 → 2200ms
+    // Generate scatter data for 4 cowry shells
+    _cowryData = List.generate(4, (i) {
+      final angle = (i * pi / 2) + _rng.nextDouble() * 0.5 - 0.25;
+      final dist = 30.0 + _rng.nextDouble() * 50.0;
+      return _CowryScatterData(
+        targetX: cos(angle) * dist,
+        targetY: sin(angle) * dist - 10,
+        rotation: (_rng.nextDouble() - 0.5) * 1.2,
+        delay: i * 0.08,
+        isUp: i < 2, // 2 up, 2 down
+      );
+    });
+
+    // Golden sparkle particles
+    _sparkles = List.generate(20, (i) {
+      return _SparkleData(
+        startX: (_rng.nextDouble() - 0.5) * 200,
+        startY: (_rng.nextDouble() - 0.5) * 300,
+        drift: (_rng.nextDouble() - 0.5) * 40,
+        speed: 0.3 + _rng.nextDouble() * 0.7,
+        size: 1.5 + _rng.nextDouble() * 2.5,
+        phaseOffset: _rng.nextDouble() * 2 * pi,
+      );
+    });
+
+    // Master timeline: 0 → 6500ms
     _masterCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 6500),
     );
 
-    // Exit fade: 300ms
+    // Exit fade: 500ms
     _exitCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500),
     );
 
-    // Phase 1: Grid pattern fades in (200ms–400ms → 0.09–0.18 of 2200)
+    // Continuous sparkle loop
+    _sparkleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat();
+
+    // Phase 1: Grid pattern fades in immediately
     _gridPatternOpacity = Tween<double>(begin: 0, end: 0.06).animate(
+      CurvedAnimation(
+        parent: _masterCtrl,
+        curve: const Interval(0.0, 0.09, curve: Curves.easeOut),
+      ),
+    );
+
+    // Phase 2: Center bloom (0.09–0.18)
+    _centerBloom = Tween<double>(begin: 0, end: 40).animate(
       CurvedAnimation(
         parent: _masterCtrl,
         curve: const Interval(0.09, 0.18, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 2: Center bloom (400ms–800ms → 0.18–0.36)
-    _centerBloom = Tween<double>(begin: 0, end: 40).animate(
-      CurvedAnimation(
-        parent: _masterCtrl,
-        curve: const Interval(0.18, 0.36, curve: Curves.easeOut),
-      ),
-    );
-
-    // Phase 3: Grid lines draw (600ms–900ms → 0.27–0.41)
+    // Phase 3: Grid lines draw (0.14–0.27)
     _gridLinesDraw = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.27, 0.41, curve: Curves.decelerate),
+        curve: const Interval(0.14, 0.27, curve: Curves.decelerate),
       ),
     );
 
-    // Phase 4: Safe square pulse (900ms–1050ms → 0.41–0.48)
+    // Phase 4: Safe square pulse (0.27–0.36)
     _safeSquarePulse = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.41, 0.48, curve: Curves.easeOut),
+        curve: const Interval(0.27, 0.36, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 5: Title fade + slide (1100ms–1500ms → 0.5–0.68)
+    // Phase 5: Title (0.28–0.42)
     _titleOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.5, 0.68, curve: Curves.easeOutCubic),
+        curve: const Interval(0.28, 0.42, curve: Curves.easeOutCubic),
       ),
     );
     _titleSlide = Tween<Offset>(
@@ -104,29 +146,47 @@ class _SplashScreenState extends State<SplashScreen>
     ).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.5, 0.68, curve: Curves.easeOutCubic),
+        curve: const Interval(0.28, 0.42, curve: Curves.easeOutCubic),
       ),
     );
 
-    // Subtitle delayed slightly (1300ms → 0.59)
+    // Phase 6: Subtitle (0.36–0.48)
     _subtitleOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.59, 0.73, curve: Curves.easeOut),
+        curve: const Interval(0.36, 0.48, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 6: Cowry drop + bounce (1600ms–2000ms → 0.73–0.91)
-    _cowryDrop = Tween<double>(begin: -30, end: 0).animate(
+    // Phase 7: Tagline letter-by-letter (0.40–0.60)
+    _taglineProgress = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.73, 0.82, curve: Curves.easeIn),
+        curve: const Interval(0.40, 0.60, curve: Curves.linear),
       ),
     );
-    _cowryBounce = Tween<double>(begin: 0, end: 1).animate(
+
+    // Phase 8: 4 cowry shells scatter from center (0.50–0.68)
+    _cowryScatterProgress = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.82, 0.91, curve: Curves.bounceOut),
+        curve: const Interval(0.50, 0.68, curve: Curves.easeOut),
+      ),
+    );
+
+    // Phase 9: Golden particle burst (0.58–0.78)
+    _particleBurst = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _masterCtrl,
+        curve: const Interval(0.58, 0.78, curve: Curves.easeOut),
+      ),
+    );
+
+    // Phase 10: Floating golden dust (0.55–1.0)
+    _dustFloat = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _masterCtrl,
+        curve: const Interval(0.55, 1.0, curve: Curves.easeIn),
       ),
     );
 
@@ -135,11 +195,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _startSequence() async {
     _masterCtrl.forward();
-    // Wait for full animation + brief hold
-    await Future.delayed(const Duration(milliseconds: 2500));
+    await Future.delayed(const Duration(milliseconds: 7200));
     if (!mounted) return;
     _exitCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
     widget.onComplete();
   }
@@ -148,86 +207,153 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _masterCtrl.dispose();
     _exitCtrl.dispose();
+    _sparkleCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_masterCtrl, _exitCtrl]),
+      animation: Listenable.merge([_masterCtrl, _exitCtrl, _sparkleCtrl]),
       builder: (context, _) {
         return Opacity(
           opacity: 1.0 - _exitCtrl.value,
           child: Container(
             color: IstoColorsDark.bgPrimary,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Board animation
-                  SizedBox(
-                    width: 160,
-                    height: 160,
+            child: Stack(
+              children: [
+                // Floating golden dust sparkles (background layer)
+                if (_dustFloat.value > 0)
+                  Positioned.fill(
                     child: CustomPaint(
-                      painter: _SplashBoardPainter(
-                        gridPatternOpacity: _gridPatternOpacity.value,
-                        centerBloom: _centerBloom.value,
-                        gridLinesDraw: _gridLinesDraw.value,
-                        safeSquarePulse: _safeSquarePulse.value,
+                      painter: _SparklesPainter(
+                        sparkles: _sparkles,
+                        progress: _dustFloat.value,
+                        time: _sparkleCtrl.value,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Title: "ISTO"
-                  Transform.translate(
-                    offset: _titleSlide.value,
-                    child: Opacity(
-                      opacity: _titleOpacity.value,
-                      child: Text(
-                        'ISTO',
-                        style: GoogleFonts.lora(
-                          textStyle: IstoTypography.appTitle,
+                // Main content column
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Board animation
+                      SizedBox(
+                        width: 160,
+                        height: 160,
+                        child: CustomPaint(
+                          painter: _SplashBoardPainter(
+                            gridPatternOpacity: _gridPatternOpacity.value,
+                            centerBloom: _centerBloom.value,
+                            gridLinesDraw: _gridLinesDraw.value,
+                            safeSquarePulse: _safeSquarePulse.value,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                      const SizedBox(height: 28),
 
-                  // Subtitle: "Chowka Bara"
-                  Opacity(
-                    opacity: _subtitleOpacity.value,
-                    child: Text(
-                      'Chowka Bara',
-                      style: GoogleFonts.poppins(
-                        textStyle: IstoTypography.subtitle,
+                      // Title: "ISTO"
+                      Transform.translate(
+                        offset: _titleSlide.value,
+                        child: Opacity(
+                          opacity: _titleOpacity.value,
+                          child: Text(
+                            'ISTO',
+                            style: GoogleFonts.lora(
+                              textStyle: IstoTypography.appTitle,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                      const SizedBox(height: 4),
 
-                  // Cowry shell icon (drops and bounces)
-                  Transform.translate(
-                    offset: Offset(
-                      0,
-                      _cowryDrop.value * (1 - _cowryBounce.value),
-                    ),
-                    child: Opacity(
-                      opacity: _cowryDrop.value > -25 ? 1.0 : 0.0,
-                      child: CustomPaint(
-                        size: const Size(28, 18),
-                        painter: _MiniCowryPainter(),
+                      // Subtitle: "Chowka Bara"
+                      Opacity(
+                        opacity: _subtitleOpacity.value,
+                        child: Text(
+                          'Chowka Bara',
+                          style: GoogleFonts.poppins(
+                            textStyle: IstoTypography.subtitle,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+
+                      // Tagline with letter-by-letter reveal
+                      _buildTagline(),
+
+                      const SizedBox(height: 24),
+
+                      // 4 Cowry shells scatter animation
+                      SizedBox(
+                        width: 200,
+                        height: 70,
+                        child: CustomPaint(
+                          painter: _CowryScatterPainter(
+                            cowryData: _cowryData,
+                            progress: _cowryScatterProgress.value,
+                            particleBurst: _particleBurst.value,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
       },
     );
   }
+
+  Widget _buildTagline() {
+    const tagline = 'Traditional Indian Board Game';
+    final visibleChars = (_taglineProgress.value * tagline.length).floor();
+    if (visibleChars == 0) return const SizedBox(height: 18);
+
+    final visibleText = tagline.substring(0, visibleChars);
+    // Cursor blink when still typing
+    final showCursor = _taglineProgress.value < 1.0;
+    return SizedBox(
+      height: 18,
+      child: Text(
+        '$visibleText${showCursor ? '|' : ''}',
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: IstoColorsDark.textMuted.withValues(alpha: 0.7),
+          letterSpacing: 2.0,
+        ),
+      ),
+    );
+  }
+}
+
+// Data classes for pre-computed random scatter
+class _CowryScatterData {
+  final double targetX, targetY, rotation, delay;
+  final bool isUp;
+  _CowryScatterData({
+    required this.targetX,
+    required this.targetY,
+    required this.rotation,
+    required this.delay,
+    required this.isUp,
+  });
+}
+
+class _SparkleData {
+  final double startX, startY, drift, speed, size, phaseOffset;
+  _SparkleData({
+    required this.startX,
+    required this.startY,
+    required this.drift,
+    required this.speed,
+    required this.size,
+    required this.phaseOffset,
+  });
 }
 
 /// Paints the mini 5×5 board for the splash animation
@@ -373,49 +499,195 @@ class _SplashBoardPainter extends CustomPainter {
   bool shouldRepaint(covariant _SplashBoardPainter old) => true;
 }
 
-/// Paints a tiny cowry shell icon for the splash
-class _MiniCowryPainter extends CustomPainter {
+/// Paints 4 cowry shells scattering from center + golden particle burst
+class _CowryScatterPainter extends CustomPainter {
+  final List<_CowryScatterData> cowryData;
+  final double progress; // 0→1 scatter
+  final double particleBurst; // 0→1 particles
+
+  _CowryScatterPainter({
+    required this.cowryData,
+    required this.progress,
+    required this.particleBurst,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final cy = h / 2;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
 
-    // Shell shape — oval
-    final shellPath =
-        Path()
-          ..moveTo(w * 0.12, cy)
-          ..cubicTo(w * 0.12, h * 0.15, w * 0.35, 0, cx, 0)
-          ..cubicTo(w * 0.65, 0, w * 0.88, h * 0.15, w * 0.88, cy)
-          ..cubicTo(w * 0.88, h * 0.85, w * 0.65, h, cx, h)
-          ..cubicTo(w * 0.35, h, w * 0.12, h * 0.85, w * 0.12, cy)
-          ..close();
+    // Golden particle burst behind shells
+    if (particleBurst > 0) {
+      _drawParticleBurst(canvas, cx, cy);
+    }
+
+    // Draw 4 cowry shells scattering
+    if (progress > 0) {
+      for (int i = 0; i < cowryData.length; i++) {
+        final data = cowryData[i];
+        // Stagger each shell
+        final shellT = ((progress - data.delay) / (1.0 - data.delay)).clamp(
+          0.0,
+          1.0,
+        );
+        if (shellT <= 0) continue;
+
+        // Bounce easing
+        final t = _bounceOut(shellT);
+        final x = cx + data.targetX * t;
+        final y = cy + data.targetY * t;
+        final rot = data.rotation * t;
+
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(rot);
+
+        // Scale: start small (gathering), grow as scattered
+        final scale = 0.4 + 0.6 * shellT;
+        canvas.scale(scale, scale);
+
+        _drawMiniCowry(canvas, 32, 20, data.isUp);
+        canvas.restore();
+      }
+    }
+  }
+
+  void _drawParticleBurst(Canvas canvas, double cx, double cy) {
+    final rng = Random(12);
+    final particleCount = 16;
+    for (int i = 0; i < particleCount; i++) {
+      final angle = (i / particleCount) * 2 * pi + rng.nextDouble() * 0.3;
+      final maxR = 40.0 + rng.nextDouble() * 50.0;
+      final r = maxR * particleBurst;
+      final pSize =
+          (1.5 + rng.nextDouble() * 2.0) * (1.0 - particleBurst * 0.5);
+      final alpha = (1.0 - particleBurst) * 0.7;
+
+      canvas.drawCircle(
+        Offset(cx + cos(angle) * r, cy + sin(angle) * r),
+        pSize,
+        Paint()
+          ..color = const Color(0xFFD4A843).withValues(alpha: alpha)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+    }
+
+    // Central glow
+    final glowAlpha = (1.0 - particleBurst) * 0.3;
+    canvas.drawCircle(
+      Offset(cx, cy),
+      20 * particleBurst,
+      Paint()
+        ..color = const Color(0xFFD4A843).withValues(alpha: glowAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+  }
+
+  void _drawMiniCowry(Canvas canvas, double w, double h, bool isUp) {
+    final cx = 0.0;
+    final cy = 0.0;
+    final halfW = w / 2;
+    final halfH = h / 2;
+
+    final shellPath = Path();
+    shellPath.moveTo(-halfW + w * 0.03, cy);
+    shellPath.cubicTo(
+      -halfW + w * 0.08,
+      -halfH + h * 0.06,
+      -halfW + w * 0.30,
+      -halfH - h * 0.02,
+      cx,
+      -halfH,
+    );
+    shellPath.cubicTo(
+      -halfW + w * 0.70,
+      -halfH - h * 0.02,
+      -halfW + w * 0.92,
+      -halfH + h * 0.06,
+      -halfW + w * 0.97,
+      cy,
+    );
+    shellPath.cubicTo(
+      -halfW + w * 0.92,
+      -halfH + h * 0.94,
+      -halfW + w * 0.70,
+      -halfH + h * 1.02,
+      cx,
+      halfH,
+    );
+    shellPath.cubicTo(
+      -halfW + w * 0.30,
+      -halfH + h * 1.02,
+      -halfW + w * 0.08,
+      -halfH + h * 0.94,
+      -halfW + w * 0.03,
+      cy,
+    );
+    shellPath.close();
 
     // Shadow
     canvas.drawPath(
-      shellPath.shift(const Offset(0.5, 1.5)),
+      shellPath.shift(const Offset(0.8, 2)),
       Paint()
         ..color = Colors.black.withValues(alpha: 0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
     );
 
-    // Fill: ivory
-    canvas.drawPath(shellPath, Paint()..color = const Color(0xFFF5F0E0));
+    if (isUp) {
+      // Ivory gradient
+      final gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFFFFFBF0),
+          const Color(0xFFF5ECD6),
+          const Color(0xFFEADFC2),
+        ],
+      ).createShader(Rect.fromCenter(center: Offset.zero, width: w, height: h));
+      canvas.drawPath(shellPath, Paint()..shader = gradient);
 
-    // Slit line
-    final slitPath =
-        Path()
-          ..moveTo(w * 0.3, cy * 0.95)
-          ..cubicTo(w * 0.4, cy * 1.2, w * 0.6, cy * 1.2, w * 0.7, cy * 0.95);
-    canvas.drawPath(
-      slitPath,
-      Paint()
-        ..color = const Color(0xFFA08050)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2
-        ..strokeCap = StrokeCap.round,
-    );
+      // Slit
+      final slitPath = Path();
+      slitPath.moveTo(-halfW + w * 0.25, cy);
+      slitPath.cubicTo(
+        -halfW + w * 0.35,
+        cy + h * 0.12,
+        -halfW + w * 0.65,
+        cy + h * 0.12,
+        -halfW + w * 0.75,
+        cy,
+      );
+      canvas.drawPath(
+        slitPath,
+        Paint()
+          ..color = const Color(0xFFA08050)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..strokeCap = StrokeCap.round,
+      );
+    } else {
+      // Brown convex side
+      final gradient = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFFD4B896),
+          const Color(0xFFB89470),
+          const Color(0xFF9C7A56),
+        ],
+      ).createShader(Rect.fromCenter(center: Offset.zero, width: w, height: h));
+      canvas.drawPath(shellPath, Paint()..shader = gradient);
+
+      // Ridge line
+      canvas.drawLine(
+        Offset(-halfW + w * 0.2, cy),
+        Offset(-halfW + w * 0.8, cy),
+        Paint()
+          ..color = const Color(0xFF8B6E4E).withValues(alpha: 0.5)
+          ..strokeWidth = 0.6
+          ..strokeCap = StrokeCap.round,
+      );
+    }
 
     // Border
     canvas.drawPath(
@@ -427,6 +699,73 @@ class _MiniCowryPainter extends CustomPainter {
     );
   }
 
+  static double _bounceOut(double t) {
+    if (t < 1 / 2.75) {
+      return 7.5625 * t * t;
+    } else if (t < 2 / 2.75) {
+      t -= 1.5 / 2.75;
+      return 7.5625 * t * t + 0.75;
+    } else if (t < 2.5 / 2.75) {
+      t -= 2.25 / 2.75;
+      return 7.5625 * t * t + 0.9375;
+    } else {
+      t -= 2.625 / 2.75;
+      return 7.5625 * t * t + 0.984375;
+    }
+  }
+
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CowryScatterPainter old) =>
+      old.progress != progress || old.particleBurst != particleBurst;
+}
+
+/// Floating golden dust sparkles across screen
+class _SparklesPainter extends CustomPainter {
+  final List<_SparkleData> sparkles;
+  final double progress; // 0→1 fade in
+  final double time; // 0→1 looping
+
+  _SparklesPainter({
+    required this.sparkles,
+    required this.progress,
+    required this.time,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    for (final s in sparkles) {
+      final phase = (time * s.speed + s.phaseOffset) % 1.0;
+      // Twinkle: alpha oscillates
+      final twinkle = (sin(phase * 2 * pi) + 1) / 2; // 0→1→0
+      final alpha = progress * twinkle * 0.4;
+      if (alpha < 0.02) continue;
+
+      final x = cx + s.startX + s.drift * sin(phase * 2 * pi);
+      final y = cy + s.startY - 20 * phase; // Gentle upward drift
+
+      // Sparkle cross shape
+      final sparkleSize = s.size * (0.5 + twinkle * 0.5);
+      final paint =
+          Paint()..color = const Color(0xFFD4A843).withValues(alpha: alpha);
+
+      canvas.drawCircle(Offset(x, y), sparkleSize * 0.5, paint);
+      // Cross arms for sparkle effect
+      canvas.drawLine(
+        Offset(x - sparkleSize, y),
+        Offset(x + sparkleSize, y),
+        paint..strokeWidth = 0.5,
+      );
+      canvas.drawLine(
+        Offset(x, y - sparkleSize),
+        Offset(x, y + sparkleSize),
+        paint..strokeWidth = 0.5,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklesPainter old) => true;
 }

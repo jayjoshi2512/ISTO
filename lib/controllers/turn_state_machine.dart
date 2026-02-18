@@ -1,7 +1,7 @@
 import '../models/models.dart';
 
 /// State machine for managing turn flow and extra turns
-/// 
+///
 /// AUTHENTIC ISTO RULES FOR EXTRA TURNS:
 /// - CHAMMA (4) or ASHTA (8) grants extra turn
 /// - Killing an opponent grants extra turn
@@ -37,7 +37,8 @@ class TurnStateMachine {
   /// Handle when no valid moves are available
   void onNoValidMoves() {
     phase = TurnPhase.checkingExtraTurn;
-    _endTurnOrGrantExtra();
+    // Don't call _endTurnOrGrantExtra here — GameManager._checkGameState
+    // handles the turn transition and AI scheduling consistently.
   }
 
   /// Handle pawn selection

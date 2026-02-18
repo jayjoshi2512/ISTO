@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isto_game/controllers/controllers.dart';
-import 'package:isto_game/models/models.dart';
+import 'package:isto/controllers/controllers.dart';
+import 'package:isto/models/models.dart';
 
 void main() {
   group('BoardController', () {
@@ -11,8 +11,8 @@ void main() {
     });
 
     test('initializes all valid squares', () {
-      // Should have 21 squares (cross shape)
-      expect(boardController.squares.length, 21);
+      // Full 5x5 board = 25 squares
+      expect(boardController.squares.length, 25);
     });
 
     test('center square is correctly typed', () {
@@ -41,17 +41,17 @@ void main() {
       expect(outer!.type, SquareType.outer);
     });
 
-    test('invalid squares return null', () {
-      expect(boardController.getSquareAt(0, 0), isNull);
-      expect(boardController.getSquareAt(4, 4), isNull);
+    test('corner squares are valid in full board', () {
+      expect(boardController.getSquareAt(0, 0), isNotNull);
+      expect(boardController.getSquareAt(4, 4), isNotNull);
     });
 
     test('getSquareFromPath returns correct square', () {
       final square = boardController.getSquareFromPath(0, 0);
       expect(square, isNotNull);
-      // Player 0 starts at [3, 0]
-      expect(square!.row, 3);
-      expect(square.col, 0);
+      // Player 0 starts at [4, 2] (bottom middle)
+      expect(square!.row, 4);
+      expect(square.col, 2);
     });
 
     test('isAtCenter detects center correctly', () {
@@ -70,16 +70,24 @@ void main() {
 
       test('home pawns can move on ISTO', () {
         final validMoves = boardController.getValidMoves(
-          0, 8, pawnController.pawns, true);
-        
+          0,
+          8,
+          pawnController.pawns,
+          true,
+        );
+
         // All 4 home pawns should be able to enter
         expect(validMoves.length, 4);
       });
 
       test('home pawns cannot move on regular roll', () {
         final validMoves = boardController.getValidMoves(
-          0, 2, pawnController.pawns, false);
-        
+          0,
+          2,
+          pawnController.pawns,
+          false,
+        );
+
         // No home pawns can move
         expect(validMoves.length, 0);
       });
@@ -87,20 +95,28 @@ void main() {
       test('active pawn can move normally', () {
         final pawn = pawnController.pawns.first;
         pawn.enterBoard();
-        
+
         final validMoves = boardController.getValidMoves(
-          0, 2, pawnController.pawns, false);
-        
+          0,
+          2,
+          pawnController.pawns,
+          false,
+        );
+
         expect(validMoves.contains(pawn), true);
       });
 
       test('finished pawns cannot move', () {
         final pawn = pawnController.pawns.first;
         pawn.finish();
-        
+
         final validMoves = boardController.getValidMoves(
-          0, 2, pawnController.pawns, true);
-        
+          0,
+          2,
+          pawnController.pawns,
+          true,
+        );
+
         expect(validMoves.contains(pawn), false);
       });
     });

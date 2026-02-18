@@ -15,6 +15,8 @@ ISTO is a classic cross-and-circle board game from India, similar to Pachisi and
 - **Authentic Rules**: True to traditional ISTO gameplay
 - **2-4 Players**: Local pass-and-play multiplayer
 - **Cowry Dice**: Traditional cowry shell mechanics
+- **How to Play**: Comprehensive in-game rules reference (accessible from menu & settings)
+- **Visual Guides**: Colored arrows showing inner ring entry points per player
 - **Clean UI/UX**: Modern, minimal, professional design
 - **Smooth Animations**: Subtle, purposeful animations
 
@@ -23,25 +25,39 @@ ISTO is a classic cross-and-circle board game from India, similar to Pachisi and
 ### Cowry (Dwaries) Rolls
 
 | Cowries Up | Name | Steps | Extra Turn |
-|------------|------|-------|------------|
-| 0 | ISTO | 8 | ✅ |
-| 1 | — | 1 | ❌ |
-| 2 | — | 2 | ❌ |
-| 3 | — | 3 | ❌ |
-| 4 | ચોમ | 4 | ✅ |
+| ---------- | ---- | ----- | ---------- |
+| 0          | ISTO | 8     | ✅         |
+| 1          | —    | 1     | ❌         |
+| 2          | —    | 2     | ❌         |
+| 3          | —    | 3     | ❌         |
+| 4          | ચોમ  | 4     | ✅         |
 
 ### Entry Rules
+
 - Pawns can only exit home on **ISTO** (0-up) or **ચોમ** (4-up)
 
 ### Path Rules
+
 - **Outer Path**: Max 1 pawn per square, single kills only
 - **Inner Path**: Multiple pawns allowed, single or paired kills
 - **Center**: Safe zone, final destination
 
+### Inner Ring Entry Requirement
+
+- **A pawn can only enter the inner ring after capturing at least one opponent pawn**
+- Colored arrows (➜) on the board show each player's inner ring entry point
+- Until a capture is made, pawns must remain on the outer ring
+
 ### Extra Turn Triggers
+
 - Rolling ISTO or ચોમ
 - Reaching the center
 - Killing an opponent pawn
+
+### Safe Squares
+
+- 4 starting positions (marked with X) + center are safe zones
+- No captures allowed on safe squares
 
 ## 🏗️ Project Structure
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isto_game/models/models.dart';
+import 'package:isto/models/models.dart';
 
 void main() {
   group('CowryRoll', () {
@@ -11,7 +11,7 @@ void main() {
       expect(roll.isChom, false);
       expect(roll.grantsExtraTurn, true);
       expect(roll.allowsEntry, true);
-      expect(roll.displayName, 'ISTO');
+      expect(roll.displayName, 'ASHTA');
     });
 
     test('1-up returns 1 step and no extra turn', () {
@@ -21,7 +21,7 @@ void main() {
       expect(roll.isISTO, false);
       expect(roll.isChom, false);
       expect(roll.grantsExtraTurn, false);
-      expect(roll.allowsEntry, false);
+      expect(roll.allowsEntry, true); // 1 allows entry per game rules
     });
 
     test('2-up returns 2 steps and no extra turn', () {
@@ -48,7 +48,7 @@ void main() {
       expect(roll.isChom, true);
       expect(roll.grantsExtraTurn, true);
       expect(roll.allowsEntry, true);
-      expect(roll.displayName, 'ચોમ');
+      expect(roll.displayName, 'CHOWKA');
     });
 
     test('random roll generates valid cowries', () {

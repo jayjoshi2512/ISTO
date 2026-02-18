@@ -50,8 +50,50 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
     final boardTotalSize = 5 * squareSize + 4 * 2;
     final boardX = (size.x - boardTotalSize) / 2;
-    final homeAreaHeight = boardTotalSize * 0.16 + 10;
-    final boardY = (size.y - boardTotalSize) / 2 + homeAreaHeight * 0.3;
+
+    // Home areas in LayoutConfig use: height = boardTotalSize * 0.16, offset = 10
+    // Top areas sit at y = -(height+offset) relative to board origin
+    // Bottom areas sit at y = boardTotalSize + offset
+    final homeHeight = boardTotalSize * 0.16;
+    final homeOffset = 10.0;
+    // Label height above top home area (name text + gap)
+    final labelAboveHome = 16.0;
+    final spaceAboveBoard = labelAboveHome + homeHeight + homeOffset;
+    final spaceBelowBoard =
+        homeHeight + homeOffset + 16.0; // 16 for label below
+
+    final hudHeight = 60.0;
+    final bottomPadding = 12.0;
+    final cowryZoneHeight = 100.0;
+
+    // Total content from top to bottom:
+    final totalNeeded =
+        hudHeight +
+        4 +
+        spaceAboveBoard +
+        boardTotalSize +
+        spaceBelowBoard +
+        8 +
+        cowryZoneHeight +
+        bottomPadding;
+
+    // Board Y: ensures top home labels clear HUD
+    double boardY;
+    if (totalNeeded <= size.y) {
+      final extra = size.y - totalNeeded;
+      boardY = hudHeight + 4 + spaceAboveBoard + extra * 0.25;
+    } else {
+      boardY = hudHeight + 4 + spaceAboveBoard;
+    }
+
+    // Bottom of the bottom home areas (including label)
+    final bottomHomesEnd =
+        boardY + boardTotalSize + homeOffset + homeHeight + 16;
+    // Cowry zone uses ALL available space below home areas
+    final availableCowryHeight = (size.y - bottomPadding - bottomHomesEnd)
+        .clamp(60.0, 200.0);
+    final cowryY = bottomHomesEnd + availableCowryHeight / 2;
+    final cowryWidth = size.x - 16; // Full width with small padding
 
     boardComponent = BoardComponent(
       position: Vector2(boardX, boardY),
@@ -63,8 +105,10 @@ class ISTOGame extends FlameGame with TapCallbacks {
     add(boardComponent);
 
     cowryDisplayComponent = CowryDisplayComponent(
-      position: Vector2(size.x / 2, size.y - 130),
+      position: Vector2(size.x / 2, cowryY),
+      componentSize: Vector2(cowryWidth, availableCowryHeight),
       onAnimationComplete: _onCowryAnimationDone,
+      onTap: _onCowryTap,
     );
     add(cowryDisplayComponent);
 
@@ -76,13 +120,22 @@ class ISTOGame extends FlameGame with TapCallbacks {
     final screenWidth = size.x;
     final screenHeight = size.y;
     final availableWidth = screenWidth - 32;
-    final availableHeight = screenHeight - 240;
+    // Reserve height for: HUD(60) + gap(8) + topHome + board + bottomHome + gap(12) + cowry(100) + padding(16)
+    // topHome + bottomHome = 2 * (board * 0.16 + 10)
+    // So total non-board = 60 + 8 + 2*(board*0.16+10) + 12 + 100 + 16 = 216 + 0.32*board
+    // board + 0.32*board = 1.32*board = screenHeight - 216
+    // board = (screenHeight - 216) / 1.32
+    // Account for: HUD(60) + gap(4) + labelAbove(16) + topHome(board*0.16+10) + board
+    // + bottomHome(board*0.16+10+16) + gap(8) + cowry(100) + padding(12)
+    // Non-board = 60+4+16+10+10+16+8+100+12 = 236 + 0.32*board
+    // 1.32*board = screenHeight - 236
+    final availableForBoard = (screenHeight - 236) / 1.32;
     final boardArea =
-        availableWidth < availableHeight ? availableWidth : availableHeight;
+        availableWidth < availableForBoard ? availableWidth : availableForBoard;
 
     squareSize = (boardArea - 8) / 5;
     if (squareSize < 40) squareSize = 40;
-    if (squareSize > 100) squareSize = 100;
+    if (squareSize > 80) squareSize = 80;
     boardSize = squareSize * 5 + 8;
     pawnSize = squareSize * 0.5;
   }
@@ -148,26 +201,22 @@ class ISTOGame extends FlameGame with TapCallbacks {
   }
 
   List<Pawn>? get pendingStackedPawns => _pendingStackedPawns;
-  int get currentRollValue =>
-      gameManager.cowryController.lastRoll?.steps ?? 0;
+  int get currentRollValue => gameManager.cowryController.lastRoll?.steps ?? 0;
+
+  // ========== COWRY TAP (replaces roll button) ==========
+
+  void _onCowryTap() {
+    if (gameManager.currentPhase == TurnPhase.waitingForRoll &&
+        !gameManager.isCurrentPlayerAI) {
+      rollCowries();
+    }
+  }
 
   // ========== STATE CHANGE HANDLERS ==========
 
   void _onGameStateChanged() {
     boardComponent.updateDisplay();
-
-    if (gameManager.currentPhase == TurnPhase.waitingForRoll) {
-      // Only show roll button for human players
-      if (!gameManager.isCurrentPlayerAI) {
-        if (!overlays.isActive(rollButtonOverlay)) {
-          overlays.add(rollButtonOverlay);
-        }
-      } else {
-        overlays.remove(rollButtonOverlay);
-      }
-    } else {
-      overlays.remove(rollButtonOverlay);
-    }
+    // No roll button needed — cowry zone handles tap
   }
 
   void _onRollComplete(CowryRoll roll) {
@@ -186,7 +235,10 @@ class ISTOGame extends FlameGame with TapCallbacks {
           result.fromPathIndex != null &&
           result.toPathIndex != null) {
         boardComponent.animatePawnMove(
-            pawn, result.fromPathIndex!, result.toPathIndex!);
+          pawn,
+          result.fromPathIndex!,
+          result.toPathIndex!,
+        );
       }
     }
 
@@ -209,7 +261,6 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
   void _onGameOver(int winnerId) {
     overlays.add(winOverlay);
-    overlays.remove(rollButtonOverlay);
     _feedback.onWin();
   }
 
@@ -233,8 +284,17 @@ class ISTOGame extends FlameGame with TapCallbacks {
   }
 
   void _onExtraTurn() {
-    overlays.add('extraTurn');
-    _feedback.onExtraTurn();
+    // Delay extra turn toast if capture toast is already showing,
+    // so they appear sequentially instead of simultaneously
+    final delay =
+        overlays.isActive('capture')
+            ? const Duration(milliseconds: 600)
+            : Duration.zero;
+    Future.delayed(delay, () {
+      if (!isLoaded) return;
+      overlays.add('extraTurn');
+      _feedback.onExtraTurn();
+    });
   }
 
   void _onNoValidMoves() {
@@ -278,11 +338,6 @@ class ISTOGame extends FlameGame with TapCallbacks {
     overlays.remove(menuOverlay);
     highlightedPawns.clear();
     gameManager.startGame(players: playerCount, config: config);
-    if (!gameManager.isCurrentPlayerAI) {
-      if (!overlays.isActive(rollButtonOverlay)) {
-        overlays.add(rollButtonOverlay);
-      }
-    }
     if (!overlays.isActive(turnIndicatorOverlay)) {
       overlays.add(turnIndicatorOverlay);
     }

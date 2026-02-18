@@ -2,7 +2,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:isto_game/main.dart';
+import 'package:isto/main.dart';
 
 void main() {
   testWidgets('ISTO app loads', (WidgetTester tester) async {
@@ -11,5 +11,8 @@ void main() {
 
     // Verify that our app renders
     expect(find.byType(ISTOApp), findsOneWidget);
+
+    // Advance past splash screen timers (animated background never settles)
+    await tester.pump(const Duration(seconds: 5));
   });
 }

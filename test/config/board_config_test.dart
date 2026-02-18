@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isto_game/config/board_config.dart';
+import 'package:isto/config/board_config.dart';
 
 void main() {
   group('BoardConfig', () {
@@ -35,17 +35,20 @@ void main() {
       test('center 3x3 squares are valid', () {
         for (int r = 1; r <= 3; r++) {
           for (int c = 1; c <= 3; c++) {
-            expect(BoardConfig.isValidSquare(r, c), true,
-                reason: 'Square [$r,$c] should be valid');
+            expect(
+              BoardConfig.isValidSquare(r, c),
+              true,
+              reason: 'Square [$r,$c] should be valid',
+            );
           }
         }
       });
 
-      test('corner squares are invalid', () {
-        expect(BoardConfig.isValidSquare(0, 0), false);
-        expect(BoardConfig.isValidSquare(0, 4), false);
-        expect(BoardConfig.isValidSquare(4, 0), false);
-        expect(BoardConfig.isValidSquare(4, 4), false);
+      test('corner squares are valid in full 5x5 board', () {
+        expect(BoardConfig.isValidSquare(0, 0), true);
+        expect(BoardConfig.isValidSquare(0, 4), true);
+        expect(BoardConfig.isValidSquare(4, 0), true);
+        expect(BoardConfig.isValidSquare(4, 4), true);
       });
     });
 
@@ -98,17 +101,23 @@ void main() {
           BoardConfig.player2Path.length,
           BoardConfig.player3Path.length,
         ];
-        
-        expect(lengths.every((l) => l == lengths.first), true,
-            reason: 'All paths should have same length');
+
+        expect(
+          lengths.every((l) => l == lengths.first),
+          true,
+          reason: 'All paths should have same length',
+        );
       });
 
       test('all path positions are valid squares', () {
         for (int p = 0; p < 4; p++) {
           final path = BoardConfig.getPlayerPath(p);
           for (final pos in path) {
-            expect(BoardConfig.isValidSquare(pos[0], pos[1]), true,
-                reason: 'Player $p path has invalid square [$pos]');
+            expect(
+              BoardConfig.isValidSquare(pos[0], pos[1]),
+              true,
+              reason: 'Player $p path has invalid square [$pos]',
+            );
           }
         }
       });
@@ -117,9 +126,8 @@ void main() {
     group('getAllValidSquares', () {
       test('returns correct number of squares', () {
         final squares = BoardConfig.getAllValidSquares();
-        // Cross shape: 3x5 vertical + 5x3 horizontal - 3x3 overlap = 21
-        // Actually: top arm (3) + bottom arm (3) + left arm (3) + right arm (3) + center 3x3 (9) = 21
-        expect(squares.length, 21);
+        // Full 5x5 board = 25 squares
+        expect(squares.length, 25);
       });
     });
   });

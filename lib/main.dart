@@ -111,8 +111,6 @@ class _GameScreenState extends State<GameScreen> {
       body: GameWidget<ISTOGame>(
         game: game,
         overlayBuilderMap: {
-          ISTOGame.rollButtonOverlay:
-              (context, game) => RollButtonOverlay(game: game),
           ISTOGame.turnIndicatorOverlay:
               (context, game) => TurnIndicatorOverlay(game: game),
           ISTOGame.winOverlay: (context, game) => WinOverlay(game: game),
@@ -128,6 +126,7 @@ class _GameScreenState extends State<GameScreen> {
           'capture': (context, game) => CaptureOverlay(game: game),
           'noMoves': (context, game) => NoMovesOverlay(game: game),
           'settings': (context, game) => SettingsOverlay(game: game),
+          'howToPlay': (context, game) => HowToPlayOverlay(game: game),
         },
         loadingBuilder:
             (context) => Container(

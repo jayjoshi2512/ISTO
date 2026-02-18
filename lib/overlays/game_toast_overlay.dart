@@ -164,7 +164,7 @@ class _CaptureOverlayState extends State<CaptureOverlay>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: 80,
+      top: 140,
       left: 0,
       right: 0,
       child: FadeTransition(

@@ -6,3 +6,4 @@ export 'game_toast_overlay.dart';
 export 'splash_screen.dart';
 export 'settings_overlay.dart';
 export 'stacked_pawn_dialog.dart';
+export 'how_to_play_overlay.dart';

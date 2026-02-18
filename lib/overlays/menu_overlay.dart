@@ -7,6 +7,7 @@ import '../game/isto_game.dart';
 import '../models/game_mode.dart';
 import '../theme/isto_tokens.dart';
 import '../components/animated_background.dart';
+import 'how_to_play_overlay.dart';
 
 /// Home / Menu screen — clean vertical stack, board-centric.
 /// Terracotta Dusk palette, GoogleFonts Poppins + Lora.
@@ -99,6 +100,8 @@ class _MenuOverlayState extends State<MenuOverlay>
                     ],
                     const SizedBox(height: 8),
                     _buildStartButton(),
+                    const SizedBox(height: 16),
+                    _buildHowToPlay(),
                     const SizedBox(height: 36),
                   ],
                 ),
@@ -386,6 +389,44 @@ class _MenuOverlayState extends State<MenuOverlay>
       width: 200,
     );
   }
+
+  // ── How to Play link ──
+  Widget _buildHowToPlay() {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          barrierColor: Colors.transparent,
+          builder:
+              (_) =>
+                  HowToPlayOverlay(onClose: () => Navigator.of(context).pop()),
+        );
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.menu_book_rounded,
+            size: 16,
+            color: IstoColorsDark.accentPrimary.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'How to Play',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: IstoColorsDark.accentPrimary.withValues(alpha: 0.7),
+              decoration: TextDecoration.underline,
+              decorationColor: IstoColorsDark.accentPrimary.withValues(
+                alpha: 0.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Mode button (Local / vs AI) ──
@@ -513,12 +554,13 @@ class _MiniBoardPreview extends CustomPainter {
       );
     }
 
-    // Player position dots
+    // Player position dots — match startPositions per player count
+    // 2p: bottom+top, 3p: bottom+top+left, 4p: all sides
     final positions = [
-      [4, 2],
-      [0, 2],
-      [2, 0],
-      [2, 4],
+      [4, 2], // P0: Bottom
+      [0, 2], // P1: Top
+      [2, 0], // P2: Left
+      [2, 4], // P3: Right
     ];
     for (int i = 0; i < playerCount; i++) {
       final pos = positions[i];

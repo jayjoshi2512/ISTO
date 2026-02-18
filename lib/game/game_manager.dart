@@ -57,7 +57,7 @@ class GameManager {
   Function(Pawn pawn)? onAIMove;
 
   GameManager({this.playerCount = 2, GameConfig? config})
-      : gameConfig = config ?? GameConfig.local(2) {
+    : gameConfig = config ?? GameConfig.local(2) {
     _initControllers();
   }
 
@@ -109,13 +109,16 @@ class GameManager {
     this.players.clear();
     for (int i = 0; i < playerCount; i++) {
       final isAI = gameConfig.isAIPlayer(i);
-      this.players.add(Player(
-        id: i,
-        name: isAI
-            ? '${ThemeConfig.getPlayerName(i)} (AI)'
-            : ThemeConfig.getPlayerName(i),
-        color: ThemeConfig.getPlayerColor(i),
-      ));
+      this.players.add(
+        Player(
+          id: i,
+          name:
+              isAI
+                  ? '${ThemeConfig.getPlayerName(i)} (AI)'
+                  : ThemeConfig.getPlayerName(i),
+          color: ThemeConfig.getPlayerColor(i),
+        ),
+      );
       captureCount[i] = 0;
     }
 
@@ -149,7 +152,9 @@ class GameManager {
     if (_pendingHighlights != null && _pendingHighlights!.isNotEmpty) {
       onValidMovesCalculated?.call(_pendingHighlights!);
       // If AI, schedule move now
-      if (isCurrentPlayerAI && aiController != null && _pendingHighlightRoll != null) {
+      if (isCurrentPlayerAI &&
+          aiController != null &&
+          _pendingHighlightRoll != null) {
         _scheduleAIMove(_pendingHighlights!, _pendingHighlightRoll!);
       }
     }
@@ -160,7 +165,9 @@ class GameManager {
   /// Roll the cowries
   CowryRoll roll() {
     if (currentPhase != TurnPhase.waitingForRoll || _cowryAnimating) {
-      debugPrint('GameManager: Cannot roll in phase $currentPhase (animating=$_cowryAnimating)');
+      debugPrint(
+        'GameManager: Cannot roll in phase $currentPhase (animating=$_cowryAnimating)',
+      );
       return cowryController.lastRoll ?? CowryRoll.withUpCount(1);
     }
 
@@ -247,7 +254,9 @@ class GameManager {
           onAIRoll?.call();
         } else if (currentPhase == TurnPhase.selectingPawn) {
           // AI was supposed to select a pawn but didn't
-          debugPrint('AI Watchdog: AI stuck in selectingPawn, forcing roll recalc');
+          debugPrint(
+            'AI Watchdog: AI stuck in selectingPawn, forcing roll recalc',
+          );
           final roll = cowryController.lastRoll;
           if (roll != null) {
             final validPawns = _getValidPawns(roll);
@@ -259,7 +268,9 @@ class GameManager {
             }
           }
         } else if (currentPhase == TurnPhase.checkingExtraTurn) {
-          debugPrint('AI Watchdog: Stuck in checkingExtraTurn, forcing advance');
+          debugPrint(
+            'AI Watchdog: Stuck in checkingExtraTurn, forcing advance',
+          );
           _checkGameState();
         }
       }
@@ -362,7 +373,9 @@ class GameManager {
   }
 
   /// Select and move a pawn
-  MoveResult selectPawn(Pawn pawn, {int movePawnCount = 1}) {
+  /// movePawnCount: 0 = not yet decided (show dialog if stacked)
+  ///               1+ = confirmed choice from dialog or default single pawn
+  MoveResult selectPawn(Pawn pawn, {int movePawnCount = 0}) {
     if (currentPhase != TurnPhase.selectingPawn) {
       feedbackService.onInvalidMove();
       return MoveResult.failed('Cannot select pawn in phase: $currentPhase');
@@ -381,16 +394,22 @@ class GameManager {
 
     final hasCaptured = hasPlayerCaptured(pawn.playerId);
     if (!boardController.canPawnMove(
-        pawn, roll.steps, pawnController.pawns, roll.allowsEntry, hasCaptured)) {
+      pawn,
+      roll.steps,
+      pawnController.pawns,
+      roll.allowsEntry,
+      hasCaptured,
+    )) {
       feedbackService.onInvalidMove();
       return MoveResult.failed('Pawn cannot move');
     }
 
     // Check for stacked pawn dialog (human players only)
+    // Only show when movePawnCount == 0 (not yet decided)
     final stackedPawns = getStackedPawns(pawn);
     if (stackedPawns.length > 1 &&
         isPawnOnInnerPath(pawn) &&
-        movePawnCount == 1 &&
+        movePawnCount == 0 &&
         !isCurrentPlayerAI) {
       feedbackService.mediumTap();
       onStackedPawnChoice?.call(pawn, stackedPawns.length);
@@ -407,7 +426,10 @@ class GameManager {
     } else {
       if (movePawnCount > 1 && stackedPawns.length >= movePawnCount) {
         final pawnsToMove = stackedPawns.take(movePawnCount).toList();
-        result = pawnController.moveStackedPawns(pawnsToMove, roll.steps);
+        // Stacked pawn rule: total steps divided among pawns
+        // e.g., roll=2, 2 pawns → each moves 1 cell together
+        final stepsPerGroup = roll.steps ~/ movePawnCount;
+        result = pawnController.moveStackedPawns(pawnsToMove, stepsPerGroup);
       } else {
         result = pawnController.movePawn(pawn, roll.steps, attackerCount: 1);
       }

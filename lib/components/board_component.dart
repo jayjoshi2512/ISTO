@@ -91,6 +91,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
     _drawBoardBackground(canvas);
     _drawSquares(canvas);
+    _drawInnerEntryArrows(canvas); // Colored arrows showing inner ring entry
     _drawPathGlow(canvas); // Full path glow rendered before pawns
     _drawHomeAreas(canvas);
     _drawPawns(canvas);
@@ -105,6 +106,29 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       -10,
       _boardTotalSize + 20,
       _boardTotalSize + 20,
+    );
+
+    // Floating shadow beneath board per spec §6 — Board Elevation & Depth
+    final shadowRect = rect.inflate(2);
+    // Primary drop shadow: offset (0,8), blur 24, black 50%
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        shadowRect.shift(const Offset(0, 8)),
+        const Radius.circular(16),
+      ),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24),
+    );
+    // Ambient shadow: offset (0,2), blur 6
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        shadowRect.shift(const Offset(0, 2)),
+        const Radius.circular(15),
+      ),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 
     // Outer carved wood frame — uses token colors
@@ -148,6 +172,15 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       boardPaint,
     );
 
+    // Explicit outer border 2.5dp per spec §6 — 20% brighter (#8A6035)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(14)),
+      Paint()
+        ..color = IstoColorsDark.boardOuterBorder
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+
     // Subtle wood grain texture lines
     final grainPaint =
         Paint()
@@ -187,14 +220,32 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     final isKillTarget = _isKillTarget(r, c);
     final isOnPath = _isSquareOnPath(r, c);
 
-    // Square base color
+    // Safe/X-mark cells → owning player mapping (start positions)
+    final homePlayerId = _getHomeCellPlayer(r, c);
+
+    // Square base color with checkerboard alternation per spec §6
     Color baseColor;
     if (isCenter) {
       baseColor = IstoColorsDark.centerHome;
+    } else if (homePlayerId != null) {
+      // Safe square with X mark — full player background color
+      baseColor = PlayerColors.getColor(homePlayerId);
     } else if (isInner) {
-      baseColor = ThemeConfig.innerSquare;
+      // Checkerboard alternation for inner cells
+      baseColor =
+          (r + c) % 2 == 0
+              ? ThemeConfig.innerSquare
+              : Color.lerp(
+                ThemeConfig.innerSquare,
+                IstoColorsDark.boardCell,
+                0.3,
+              )!;
     } else {
-      baseColor = ThemeConfig.outerSquare;
+      // Checkerboard alternation for outer cells per spec §6
+      baseColor =
+          (r + c) % 2 == 0
+              ? IstoColorsDark.boardCell
+              : IstoColorsDark.boardCellAlt;
     }
 
     // Draw square background with subtle gradient
@@ -249,15 +300,39 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }
 
   void _drawSafeMarker(Canvas canvas, Rect rect) {
+    // Determine if this cell belongs to a player (for colored X)
+    final cellR = (rect.top / (squareSize + _gap)).round();
+    final cellC = (rect.left / (squareSize + _gap)).round();
+    final ownerPlayerId = _getHomeCellPlayer(cellR, cellC);
+
+    // X color: high-contrast white on player cells, otherwise default safe-square border
+    final xColor =
+        ownerPlayerId != null
+            ? const Color(
+              0xDDFFFAF0,
+            ) // Cream-white, high contrast on any player color
+            : IstoColorsDark.safeSquareBorder;
+
+    // Faint inner glow
+    final glowPaint =
+        Paint()
+          ..shader = ui.Gradient.radial(rect.center, squareSize * 0.45, [
+            xColor.withValues(alpha: 0.15),
+            Colors.transparent,
+          ]);
+    canvas.drawRect(rect, glowPaint);
+
+    // "X" cross mark — FULL SIZE corner-to-corner per spec §6
+    // "drawn on top, suggesting engraving"
     final paint =
         Paint()
-          ..color = ThemeConfig.safeSquareMark
-          ..strokeWidth = 1.5
+          ..color = xColor
+          ..strokeWidth = ownerPlayerId != null ? 2.5 : 2.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round;
-    final inset = squareSize * 0.25;
+    final inset = squareSize * 0.04; // Minimal inset — X fills the full box
 
-    // Ornate X pattern
+    // Draw X corner-to-corner
     canvas.drawLine(
       Offset(rect.left + inset, rect.top + inset),
       Offset(rect.right - inset, rect.bottom - inset),
@@ -269,10 +344,10 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       paint,
     );
 
-    // Small diamond at center of X
+    // Small diamond at center of X (engraved feel)
     final cx = rect.center.dx;
     final cy = rect.center.dy;
-    final d = squareSize * 0.06;
+    final d = squareSize * 0.08;
     final diamondPath =
         Path()
           ..moveTo(cx, cy - d)
@@ -282,7 +357,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
           ..close();
     canvas.drawPath(
       diamondPath,
-      Paint()..color = ThemeConfig.safeSquareMark.withValues(alpha: 0.5),
+      Paint()..color = xColor.withValues(alpha: 0.45),
     );
   }
 
@@ -363,13 +438,25 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     final center = rect.center;
     final radius = squareSize * 0.35;
 
-    // Golden gradient circle
+    // Pulsing outer glow (spec: opacity 0.6→1.0→0.6 over 3s)
+    final glowPulse = sin(_animTime * 2.09) * 0.2 + 0.35;
+    canvas.drawCircle(
+      Offset(center.dx, center.dy),
+      radius * 1.4,
+      Paint()
+        ..color = IstoColorsDark.centerHomeGlow.withValues(
+          alpha: glowPulse * 0.5,
+        )
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+
+    // Golden gradient circle base
     final gradient = ui.Gradient.radial(
       Offset(center.dx, center.dy),
       radius,
       [
-        ThemeConfig.centerSquare,
-        ThemeConfig.centerSquare.withValues(alpha: 0.6),
+        IstoColorsDark.accentGlow,
+        IstoColorsDark.accentGlow.withValues(alpha: 0.6),
         Colors.transparent,
       ],
       [0, 0.7, 1],
@@ -385,19 +472,39 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       Offset(center.dx, center.dy),
       radius * 0.55,
       Paint()
-        ..color = ThemeConfig.centerSquare.withValues(alpha: 0.8)
+        ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
 
-    // Pulsing glow
-    final glowPulse = sin(_animTime * 2) * 0.2 + 0.35;
-    canvas.drawCircle(
-      Offset(center.dx, center.dy),
-      radius * 1.3,
-      Paint()
-        ..color = ThemeConfig.centerSquareGlow.withValues(alpha: glowPulse)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    // 4-pointed asterisk / Chowka mark (spec §6 & §11)
+    // "A 4-pointed star/asterisk drawn at center. Stroke 2.5dp. Color: accent-glow"
+    final starPulse = sin(_animTime * 2.09) * 0.2 + 0.8; // 0.6→1.0 over ~3s
+    final starPaint =
+        Paint()
+          ..color = IstoColorsDark.accentGlow.withValues(alpha: starPulse)
+          ..strokeWidth = 2.5
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round;
+    final cx = center.dx;
+    final cy = center.dy;
+    final arm = squareSize * 0.22;
+
+    // Vertical line
+    canvas.drawLine(Offset(cx, cy - arm), Offset(cx, cy + arm), starPaint);
+    // Horizontal line
+    canvas.drawLine(Offset(cx - arm, cy), Offset(cx + arm, cy), starPaint);
+    // Diagonal lines (45°)
+    final diag = arm * 0.7;
+    canvas.drawLine(
+      Offset(cx - diag, cy - diag),
+      Offset(cx + diag, cy + diag),
+      starPaint,
+    );
+    canvas.drawLine(
+      Offset(cx + diag, cy - diag),
+      Offset(cx - diag, cy + diag),
+      starPaint,
     );
   }
 
@@ -416,6 +523,115 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       final px = cx + cos(angle) * radius;
       final py = cy + sin(angle) * radius;
       _drawMiniPawn(canvas, px, py, finishedPawns[i]);
+    }
+  }
+
+  // ========== INNER RING ENTRY ARROWS ==========
+
+  /// Inner ring entry points per player: [outerCell, innerCell]
+  /// Derived from paths — index 15 (last outer) → index 16 (first inner)
+  static const Map<int, List<List<int>>> _innerEntryPoints = {
+    0: [
+      [4, 1],
+      [3, 1],
+    ], // P0: bottom-left outer → inner
+    1: [
+      [0, 3],
+      [1, 3],
+    ], // P1: top-right outer → inner
+    2: [
+      [1, 0],
+      [1, 1],
+    ], // P2: top-left outer → inner
+    3: [
+      [3, 4],
+      [3, 3],
+    ], // P3: bottom-right outer → inner
+  };
+
+  void _drawInnerEntryArrows(Canvas canvas) {
+    final playerCount = gameManager.playerCount;
+    for (int p = 0; p < playerCount; p++) {
+      final entry = _innerEntryPoints[p]!;
+      final outerCell = entry[0];
+      final innerCell = entry[1];
+      final color = PlayerColors.getColor(p);
+
+      // Get pixel centers of the two cells
+      final fromX = outerCell[1] * (squareSize + _gap) + squareSize / 2;
+      final fromY = outerCell[0] * (squareSize + _gap) + squareSize / 2;
+      final toX = innerCell[1] * (squareSize + _gap) + squareSize / 2;
+      final toY = innerCell[0] * (squareSize + _gap) + squareSize / 2;
+
+      // Direction vector
+      final dx = toX - fromX;
+      final dy = toY - fromY;
+      final len = sqrt(dx * dx + dy * dy);
+      if (len == 0) continue;
+      final nx = dx / len;
+      final ny = dy / len;
+
+      // Shorten arrow: start/end inset from cell centers
+      final inset = squareSize * 0.28;
+      final startX = fromX + nx * inset;
+      final startY = fromY + ny * inset;
+      final endX = toX - nx * inset;
+      final endY = toY - ny * inset;
+
+      // Pulsing alpha for subtle animation
+      final pulse = (sin(_animTime * 2.0 + p * 0.8) * 0.15 + 0.55).clamp(
+        0.3,
+        0.8,
+      );
+
+      // Arrow shaft (dashed effect with 3 segments)
+      final shaftPaint =
+          Paint()
+            ..color = color.withValues(alpha: pulse * 0.7)
+            ..strokeWidth = 2.0
+            ..strokeCap = StrokeCap.round;
+
+      // Draw arrow line
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), shaftPaint);
+
+      // Arrowhead
+      final headLen = squareSize * 0.18;
+      final headAngle = 0.5; // ~28 degrees
+      final arrowPaint =
+          Paint()
+            ..color = color.withValues(alpha: pulse * 0.85)
+            ..strokeWidth = 2.2
+            ..strokeCap = StrokeCap.round
+            ..style = PaintingStyle.stroke;
+
+      // Left wing
+      canvas.drawLine(
+        Offset(endX, endY),
+        Offset(
+          endX - headLen * (nx * cos(headAngle) - ny * sin(headAngle)),
+          endY - headLen * (ny * cos(headAngle) + nx * sin(headAngle)),
+        ),
+        arrowPaint,
+      );
+      // Right wing
+      canvas.drawLine(
+        Offset(endX, endY),
+        Offset(
+          endX - headLen * (nx * cos(headAngle) + ny * sin(headAngle)),
+          endY - headLen * (ny * cos(headAngle) - nx * sin(headAngle)),
+        ),
+        arrowPaint,
+      );
+
+      // Subtle glow behind arrow
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(endX, endY),
+        Paint()
+          ..color = color.withValues(alpha: pulse * 0.15)
+          ..strokeWidth = 6.0
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
     }
   }
 
@@ -508,7 +724,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       playerId,
       playerCount,
       _boardTotalSize,
-      _boardTotalSize,
+      10.0,
     );
 
     final rect = homeConfig.rect.translate(0, 0);
@@ -516,20 +732,45 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     final isCurrentPlayer =
         gameManager.turnStateMachine.currentPlayerId == playerId;
 
-    // Home area background
-    final bgPaint =
-        Paint()..color = color.withValues(alpha: isCurrentPlayer ? 0.15 : 0.07);
+    // Home area background — distinctly player-colored
+    final bgAlpha = isCurrentPlayer ? 0.40 : 0.25;
+    final bgPaint = Paint()..color = color.withValues(alpha: bgAlpha);
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(10)),
       bgPaint,
     );
 
-    // Border
+    // Inner gradient for depth
+    final innerGrad = ui.Gradient.linear(
+      Offset(rect.left, rect.top),
+      Offset(rect.left, rect.bottom),
+      [
+        color.withValues(alpha: bgAlpha * 0.5),
+        color.withValues(alpha: bgAlpha * 1.3),
+      ],
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
+      Paint()..shader = innerGrad,
+    );
+
+    // Dark base behind for contrast
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(9)),
+      Paint()..color = IstoColorsDark.bgPrimary.withValues(alpha: 0.35),
+    );
+    // Re-apply player color over the dark base
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(9)),
+      Paint()..color = color.withValues(alpha: bgAlpha),
+    );
+
+    // Border — strong player color
     final borderPaint =
         Paint()
-          ..color = color.withValues(alpha: isCurrentPlayer ? 0.5 : 0.2)
+          ..color = color.withValues(alpha: isCurrentPlayer ? 0.75 : 0.45)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = isCurrentPlayer ? 2.0 : 1.0;
+          ..strokeWidth = isCurrentPlayer ? 2.0 : 1.5;
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(10)),
       borderPaint,
@@ -537,7 +778,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
     // Active player glow
     if (isCurrentPlayer) {
-      final glowPulse = sin(_animTime * 3) * 0.12 + 0.18;
+      final glowPulse = sin(_animTime * 3) * 0.12 + 0.22;
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect.inflate(3), const Radius.circular(12)),
         Paint()
@@ -584,21 +825,49 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     Pawn pawn,
     bool isHighlighted,
   ) {
-    final color = PlayerColors.getColor(pawn.playerId);
+    final baseColor = PlayerColors.getColor(pawn.playerId);
     final radius = pawnSize * 0.4;
+
+    // Spec §7: At-home desaturation — muted color when not highlighted
+    final color =
+        isHighlighted ? baseColor : IstoPlayerColors.muted(pawn.playerId);
 
     if (isHighlighted) {
       final pulse = sin(_animTime * 5) * 0.3 + 0.7;
+      // Glow ring
       canvas.drawCircle(
         Offset(x, y),
         radius + 5,
         Paint()
-          ..color = ThemeConfig.successGreen.withValues(alpha: 0.5 * pulse)
+          ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.45 * pulse)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
       );
+      // Animated dashed selection ring
+      final dashCount = 8;
+      final dashArc = (2 * pi / dashCount) * 0.6;
+      final gapArc = (2 * pi / dashCount) * 0.4;
+      final rotation = _animTime * 2.0;
+      final ringRadius = radius + 3;
+      final ringPaint =
+          Paint()
+            ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.7 * pulse)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.8
+            ..strokeCap = StrokeCap.round;
+
+      for (int i = 0; i < dashCount; i++) {
+        final startAngle = rotation + i * (dashArc + gapArc);
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset(x, y), radius: ringRadius),
+          startAngle,
+          dashArc,
+          false,
+          ringPaint,
+        );
+      }
     }
 
-    _drawPremiumPawn(canvas, x, y, radius, color);
+    _drawPremiumPawn(canvas, x, y, radius, color, playerId: pawn.playerId);
   }
 
   void _drawFinishedStar(Canvas canvas, double x, double y, Color color) {
@@ -675,23 +944,29 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
+    // For top home areas (negative Y = above board), paint label ABOVE the rect
+    // For bottom home areas, paint label BELOW the rect
+    final isTopHome = homeRect.top < 0;
+    final labelY =
+        isTopHome ? homeRect.top - textPainter.height - 3 : homeRect.bottom + 4;
     textPainter.paint(
       canvas,
-      Offset(homeRect.center.dx - textPainter.width / 2, homeRect.bottom + 4),
+      Offset(homeRect.center.dx - textPainter.width / 2, labelY),
     );
   }
 
   // ========== PREMIUM PAWN RENDERING ==========
 
-  /// Draw a premium 3D chess-piece style pawn with depth, shine, and detail
+  /// Draw a premium pawn disc with radial gradient, inner ring, and player symbol
   void _drawPremiumPawn(
     Canvas canvas,
     double x,
     double y,
     double radius,
-    Color color,
-  ) {
-    // Drop shadow — multi-layer for depth
+    Color color, {
+    int? playerId,
+  }) {
+    // Drop shadow — multi-layer for depth (spec §7: BoxShadow 0,3 blur 8dp)
     canvas.drawCircle(
       Offset(x + 1, y + 3),
       radius + 1,
@@ -700,14 +975,14 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
 
-    // Base disc (slightly larger, darker) — chess piece base
+    // Base disc (slightly larger, darker) — spec: base layer
     canvas.drawCircle(
       Offset(x, y + 2),
       radius * 1.05,
       Paint()..color = _darken(color, 45),
     );
 
-    // Main body with rich radial gradient
+    // Main body with rich radial gradient (spec §7: lighter center ~15%)
     final bodyGradient = ui.Gradient.radial(
       Offset(x - radius * 0.3, y - radius * 0.3),
       radius * 1.4,
@@ -720,6 +995,16 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       [0.0, 0.3, 0.6, 1.0],
     );
     canvas.drawCircle(Offset(x, y), radius, Paint()..shader = bodyGradient);
+
+    // Inner ring — "carved groove" (spec §7: 2dp stroke, lighter shade)
+    canvas.drawCircle(
+      Offset(x, y),
+      radius * 0.72,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
 
     // Rim light — thin bright edge for 3D pop
     canvas.drawCircle(
@@ -742,36 +1027,36 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         );
     canvas.drawPath(
       highlightPath,
-      Paint()..color = Colors.white.withValues(alpha: 0.3),
+      Paint()..color = Colors.white.withValues(alpha: 0.25),
     );
 
     // Tiny bright specular dot (the "shine point")
     canvas.drawCircle(
       Offset(x - radius * 0.25, y - radius * 0.25),
-      radius * 0.12,
-      Paint()..color = Colors.white.withValues(alpha: 0.7),
+      radius * 0.1,
+      Paint()..color = Colors.white.withValues(alpha: 0.65),
     );
 
-    // Inner ring for chess-piece identity
-    canvas.drawCircle(
-      Offset(x, y),
-      radius * 0.5,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
-
-    // Center gem/dot (player identity marker)
-    final gemGradient = ui.Gradient.radial(Offset(x, y), radius * 0.18, [
-      Colors.white.withValues(alpha: 0.8),
-      _lighten(color, 30).withValues(alpha: 0.5),
-    ]);
-    canvas.drawCircle(
-      Offset(x, y),
-      radius * 0.13,
-      Paint()..shader = gemGradient,
-    );
+    // Player symbol (spec §7: ▲ ○ ◆ +  ~14sp white 0.8 opacity)
+    if (playerId != null) {
+      final symbol = IstoPlayerColors.symbol(playerId);
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: symbol,
+          style: TextStyle(
+            fontSize: radius * 0.8,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(x - textPainter.width / 2, y - textPainter.height / 2),
+      );
+    }
   }
 
   // ========== BOARD PAWNS ==========
@@ -842,29 +1127,55 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       );
     }
 
-    // Highlight glow for valid moves
+    // Highlight glow for valid moves — spec §7: animated dashed ring
     if (isHighlighted) {
       final pulse = sin(_animTime * 4.5) * 0.3 + 0.7;
-      // Outer glow ring
+      // Outer glow ring (softer, larger)
       canvas.drawCircle(
         Offset(x, y),
-        radius + 6,
+        radius + 7,
         Paint()
-          ..color = ThemeConfig.successGreen.withValues(alpha: 0.4 * pulse)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.35 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
       );
-      // Selection ring
+
+      // Animated rotating dashed ring — spec §7: selectable state
+      final dashCount = 10;
+      final dashArc = (2 * pi / dashCount) * 0.6;
+      final gapArc = (2 * pi / dashCount) * 0.4;
+      final rotation = _animTime * 2.0; // Rotate at ~2 rad/s
+      final ringRadius = radius + 4;
+      final ringPaint =
+          Paint()
+            ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.75 * pulse)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0
+            ..strokeCap = StrokeCap.round;
+
+      for (int i = 0; i < dashCount; i++) {
+        final startAngle = rotation + i * (dashArc + gapArc);
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset(x, y), radius: ringRadius),
+          startAngle,
+          dashArc,
+          false,
+          ringPaint,
+        );
+      }
+
+      // Subtle scale pulse effect via slightly larger pawn draw
+      // (handled by scaling radius in _drawPremiumPawn would be ideal,
+      //  but we'll hint it with a brighter inner glow)
       canvas.drawCircle(
         Offset(x, y),
-        radius + 3,
+        radius + 1,
         Paint()
-          ..color = ThemeConfig.successGreen.withValues(alpha: 0.6 * pulse)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
+          ..color = IstoColorsDark.accentGlow.withValues(alpha: 0.15 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
       );
     }
 
-    _drawPremiumPawn(canvas, x, y, radius, color);
+    _drawPremiumPawn(canvas, x, y, radius, color, playerId: pawn.playerId);
   }
 
   void _drawAnimatedPawn(Canvas canvas, Pawn pawn, _PawnMoveAnim anim) {
@@ -901,6 +1212,24 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }
 
   // ========== HELPERS ==========
+
+  /// Map corner cells to player home colors
+  /// Corners are the home bases for each player
+  /// Map safe-square cells (the ones with X marks) to their owning player.
+  /// These are the start positions — the cells marked with X on the board.
+  /// Only the 4 edge-midpoint safe squares get player coloring (not center).
+  int? _getHomeCellPlayer(int r, int c) {
+    // Safe squares = start positions: P0=Bottom, P1=Top, P2=Left, P3=Right
+    final playerCount = gameManager.playerCount;
+    if (r == 4 && c == 2) return 0; // P0 start — Bottom (always active)
+    if (r == 0 && c == 2)
+      return (playerCount >= 2) ? 1 : null; // P1 start — Top
+    if (r == 2 && c == 0)
+      return (playerCount >= 3) ? 2 : null; // P2 start — Left
+    if (r == 2 && c == 4)
+      return (playerCount >= 4) ? 3 : null; // P3 start — Right
+    return null;
+  }
 
   /// Check if a square is the DESTINATION for any highlighted pawn
   bool _isSquareHighlighted(int r, int c) {

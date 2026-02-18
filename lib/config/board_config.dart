@@ -1,6 +1,6 @@
 /// Board configuration constants and path definitions
 /// ISTO/Chowka Bhara 5×5 FULL Board Layout
-/// 
+///
 /// Based on authentic rules from reference image:
 /// - 5 Safe squares (X marks): 4 edge midpoints + center
 /// - Players start at edge midpoints, NOT corners
@@ -25,6 +25,7 @@ class BoardConfig {
   ];
 
   /// Starting positions for each player (edge midpoints)
+  /// 2 players: Bottom + Top | 3 players: Bottom + Top + Left | 4 players: all sides
   static const Map<int, List<int>> startPositions = {
     0: [4, 2], // Player 0 - Bottom middle
     1: [0, 2], // Player 1 - Top middle
@@ -37,10 +38,10 @@ class BoardConfig {
   /// When reaching one square before their start, they enter inner ring
   /// Inner ring goes ANTI-CLOCKWISE around center
   /// Finally enters center (HOME)
-  /// 
+  ///
   /// Path index 0 = start position
   /// Path length = 25 (0-24)
-  
+
   /// Player 0 (Bottom middle [4,2]) path
   /// Outer: CLOCKWISE - goes right first
   /// Inner: ANTI-CLOCKWISE
@@ -138,16 +139,17 @@ class BoardConfig {
   ];
 
   /// Get path for a specific player
+  /// P0=Bottom, P1=Top, P2=Left, P3=Right
   static List<List<int>> getPlayerPath(int playerId) {
     switch (playerId) {
       case 0:
-        return player0Path;
+        return player0Path; // Bottom [4,2]
       case 1:
-        return player1Path;
+        return player1Path; // Top [0,2]
       case 2:
-        return player2Path;
+        return player2Path; // Left [2,0]
       case 3:
-        return player3Path;
+        return player3Path; // Right [2,4]
       default:
         throw ArgumentError('Invalid player ID: $playerId');
     }
