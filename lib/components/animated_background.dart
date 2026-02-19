@@ -218,7 +218,7 @@ class ShimmerEffect extends StatefulWidget {
   const ShimmerEffect({
     super.key,
     required this.child,
-    this.color = const Color(0x20FFD700),
+    this.color = const Color(0x20EED202),
     this.duration = const Duration(seconds: 2),
   });
 

@@ -265,8 +265,9 @@ class PawnController {
   /// AUTHENTIC ISTO RULES:
   /// - Safe squares (corners + center): NO kills allowed
   /// - Killing grants EXTRA TURN
-  /// - Equal numbers can kill equal numbers (2v2, 3v3, etc.)
-  /// - Cannot kill if attacker has fewer pawns than defender
+  /// - A single pawn CANNOT kill a double (or more)
+  /// - Equal or greater attacker count required: 1v1, 2v1, 2v2, etc.
+  /// - Only kills at the DESTINATION square, never intermediate
   MoveResult _resolveCollision(
     Pawn attacker,
     Square target, {
@@ -288,44 +289,39 @@ class PawnController {
       return MoveResult.moved();
     }
 
-    // ISTO RULE: Equal numbers can kill equal numbers
-    // Check if enemies are all same player (forming a stack)
+    // ISTO RULE: All enemies must be same player to form a defensive stack
     final samePlayer = enemies.every((e) => e.playerId == enemies[0].playerId);
     if (!samePlayer) {
-      // Mixed enemy pawns - shouldn't happen, but treat as multi-kill if possible
+      // Mixed enemy pawns on same square - no kill (shouldn't normally happen)
       return MoveResult.moved();
     }
 
     final defenderCount = enemies.length;
 
-    // ISTO RULE: Can only kill if attacker count >= defender count
-    // 1 can kill 1, 2 can kill 2, 2 can kill 1, but 1 cannot kill 2
+    // ISTO RULE: Attacker MUST have >= defender count to kill
+    // 1 attacker CANNOT kill 2+ defenders (doubles block)
+    // 2 attackers CAN kill 2 defenders, 2 CAN kill 1, etc.
     if (attackerCount < defenderCount) {
-      // Cannot kill - not enough attackers
-      return MoveResult.moved();
+      return MoveResult.moved(); // Blocked by defensive stack
     }
 
-    // Kill all enemy pawns on this square if equal or more attackers
-    if (attackerCount >= defenderCount) {
-      // Save victim path indices BEFORE sending home (for retreat animation)
-      final victimPaths = <String, int>{};
-      for (final enemy in enemies) {
-        victimPaths[enemy.id] = enemy.pathIndex;
-      }
-
-      for (final enemy in enemies) {
-        _sendPawnHome(enemy, target);
-      }
-
-      final killType = enemies.length > 1 ? KillType.paired : KillType.single;
-      return MoveResult.kill(
-        type: killType,
-        victims: enemies,
-        victimPathIndices: victimPaths,
-      );
+    // Kill: attacker count >= defender count
+    // Save victim path indices BEFORE sending home (for retreat animation)
+    final victimPaths = <String, int>{};
+    for (final enemy in enemies) {
+      victimPaths[enemy.id] = enemy.pathIndex;
     }
 
-    return MoveResult.moved();
+    for (final enemy in enemies) {
+      _sendPawnHome(enemy, target);
+    }
+
+    final killType = enemies.length > 1 ? KillType.paired : KillType.single;
+    return MoveResult.kill(
+      type: killType,
+      victims: enemies,
+      victimPathIndices: victimPaths,
+    );
   }
 
   /// Send a pawn back to home

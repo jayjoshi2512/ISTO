@@ -104,13 +104,14 @@ class BoardController {
         addedIds.add(pawn.id);
       } else if (pawn.isActive && !pawn.isFinished) {
         // Also check if this pawn could move as part of a stacked-split.
-        // E.g. 2 stacked pawns, roll=2, each moves 1 step to center.
+        // E.g. 2 stacked pawns, roll=4, each moves 2 steps to center.
+        // REQUIRES: roll must be evenly divisible by stack count
         final pos = getPawnPosition(pawn, allPawns);
         if (pos != null) {
           final square = getSquare(pos);
           if (square != null) {
             final stackCount = square.getFriendlyPawns(pawn.playerId).length;
-            if (stackCount > 1 && steps >= stackCount) {
+            if (stackCount > 1 && steps >= stackCount && steps % stackCount == 0) {
               final splitSteps = steps ~/ stackCount;
               if (canPawnMove(
                 pawn,
@@ -181,21 +182,19 @@ class BoardController {
       }
     }
 
-    // Check if destination is blocked by own pawn (outer path only, NOT safe squares)
+    // Check if destination is blocked by own pawn (outer path only, NOT safe squares ON ENTRY)
     final destSquare = getSquareFromPath(pawn.playerId, newIndex);
     if (destSquare == null) return false;
 
     if (destSquare.type == SquareType.outer) {
-      // ISTO RULE: Can stack multiple pawns on SAFE squares (starting positions)
+      // ISTO RULE: Stacking allowed on safe squares (home positions),
+      // but not on other outer ring squares.
       final destPos = playerPaths[pawn.playerId]![newIndex];
       final isSafe = BoardConfig.isSafeSquare(destPos);
-
       if (!isSafe) {
-        // Non-safe outer path: can't land on own pawn
         final friendlyPawns = destSquare.getFriendlyPawns(pawn.playerId);
         if (friendlyPawns.isNotEmpty) return false;
       }
-      // Safe squares: stacking allowed - no block
     }
 
     return true;

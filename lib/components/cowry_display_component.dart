@@ -28,6 +28,9 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
   // Animation phase enum
   _CowryPhase _phase = _CowryPhase.idle;
 
+  /// Current player's color for throw zone outline
+  Color currentPlayerColor = IstoColorsDark.accentPrimary;
+
   /// Callback when roll animation finishes
   final VoidCallback? onAnimationComplete;
 
@@ -241,13 +244,26 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
       Paint()..color = IstoColorsDark.bgElevated.withValues(alpha: 0.5),
     );
 
-    // Inset shadow for depth
+    // Player-colored outline on throw zone (glowing border)
+    final outlineAlpha = _phase == _CowryPhase.idle
+        ? 0.45 + 0.15 * sin(_idleTime * 2.0) // Gentle pulse when waiting
+        : (_phase == _CowryPhase.shake ? 0.7 : 0.35);
     canvas.drawRRect(
       rrect,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.15)
+        ..color = currentPlayerColor.withValues(alpha: outlineAlpha)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 2.0,
+    );
+
+    // Soft outer glow in player color
+    canvas.drawRRect(
+      rrect.inflate(2),
+      Paint()
+        ..color = currentPlayerColor.withValues(alpha: outlineAlpha * 0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
 
     // "TAP TO THROW" label above zone — spec §8: Poppins 10sp, letter-spacing 2.0
@@ -830,13 +846,8 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
 
     final color =
         isSpecial
-            ? Color.fromARGB(
-              (255 * alpha).toInt(),
-              255,
-              217,
-              138,
-            ) // accent-glow
-            : Color.fromARGB((255 * alpha * 0.85).toInt(), 245, 230, 200);
+            ? IstoColorsDark.centerHomeGlow.withValues(alpha: alpha)
+            : IstoColorsDark.textPrimary.withValues(alpha: alpha * 0.85);
 
     final textPainter = TextPainter(
       text: TextSpan(
@@ -850,8 +861,18 @@ class CowryDisplayComponent extends PositionComponent with TapCallbacks {
           shadows:
               isSpecial
                   ? [
-                    Shadow(color: const Color(0x80FFD98A), blurRadius: 12),
-                    Shadow(color: const Color(0x40FFD98A), blurRadius: 24),
+                    Shadow(
+                      color: IstoColorsDark.centerHomeGlow.withValues(
+                        alpha: 0.5,
+                      ),
+                      blurRadius: 12,
+                    ),
+                    Shadow(
+                      color: IstoColorsDark.centerHomeGlow.withValues(
+                        alpha: 0.25,
+                      ),
+                      blurRadius: 24,
+                    ),
                   ]
                   : null,
         ),

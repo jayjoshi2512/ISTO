@@ -120,9 +120,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       _boardTotalSize + 20,
     );
 
-    // Floating shadow beneath board per spec §6 — Board Elevation & Depth
+    // Drop shadow beneath board
     final shadowRect = rect.inflate(2);
-    // Primary drop shadow: offset (0,8), blur 24, black 50%
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         shadowRect.shift(const Offset(0, 8)),
@@ -132,7 +131,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         ..color = Colors.black.withValues(alpha: 0.5)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24),
     );
-    // Ambient shadow: offset (0,2), blur 6
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         shadowRect.shift(const Offset(0, 2)),
@@ -143,48 +141,25 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 
-    // Outer carved wood frame — uses token colors
-    final framePaint =
-        Paint()
-          ..shader = ui.Gradient.linear(
-            const Offset(0, 0),
-            Offset(_boardTotalSize, _boardTotalSize),
-            [
-              IstoColorsDark.bgElevated,
-              IstoColorsDark.boardOuterBorder,
-              IstoColorsDark.boardCell,
-              IstoColorsDark.bgElevated,
-            ],
-            [0, 0.3, 0.7, 1],
-          );
+    // Outer frame — solid color, no gradient shader
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(14)),
-      framePaint,
+      Paint()..color = IstoColorsDark.bgElevated,
     );
 
-    // Inner shadow for carved-in effect
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(2), const Radius.circular(12)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-
-    // Inner board area
+    // Inner board area — dark background serves as grid lines between squares
     final boardRect = Rect.fromLTWH(
       -4,
       -4,
       _boardTotalSize + 8,
       _boardTotalSize + 8,
     );
-    final boardPaint = Paint()..color = ThemeConfig.boardBackground;
     canvas.drawRRect(
       RRect.fromRectAndRadius(boardRect, const Radius.circular(8)),
-      boardPaint,
+      Paint()..color = const Color(0xFF01152E),
     );
 
-    // Explicit outer border 2.5dp per spec §6 — 20% brighter (#8A6035)
+    // Outer border stroke
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(14)),
       Paint()
@@ -192,20 +167,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
-
-    // Subtle wood grain texture lines
-    final grainPaint =
-        Paint()
-          ..color = IstoColorsDark.bgPrimary.withValues(alpha: 0.15)
-          ..strokeWidth = 0.5;
-    for (int i = 0; i < 8; i++) {
-      final y = -4.0 + (_boardTotalSize + 8) * (i / 8.0 + sin(i * 0.7) * 0.02);
-      canvas.drawLine(
-        Offset(-4, y),
-        Offset(_boardTotalSize + 4, y + sin(i * 1.3) * 3),
-        grainPaint,
-      );
-    }
   }
 
   // ========== SQUARES ==========
@@ -235,7 +196,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     // Safe/X-mark cells → owning player mapping (start positions)
     final homePlayerId = _getHomeCellPlayer(r, c);
 
-    // Square base color with checkerboard alternation per spec §6
+    // Square base color with player quadrant tinting
     Color baseColor;
     if (isCenter) {
       baseColor = IstoColorsDark.centerHome;
@@ -243,7 +204,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       // Safe square with X mark — full player background color
       baseColor = PlayerColors.getColor(homePlayerId);
     } else if (isInner) {
-      // Checkerboard alternation for inner cells
+      // Inner ring cells — subtle checkerboard with navy tones
       baseColor =
           (r + c) % 2 == 0
               ? ThemeConfig.innerSquare
@@ -253,22 +214,24 @@ class BoardComponent extends PositionComponent with TapCallbacks {
                 0.3,
               )!;
     } else {
-      // Checkerboard alternation for outer cells per spec §6
-      baseColor =
+      // Outer ring cells — tinted by player quadrant
+      final quadrantOwner = _getQuadrantOwner(r, c);
+      final darkBase =
           (r + c) % 2 == 0
               ? IstoColorsDark.boardCell
               : IstoColorsDark.boardCellAlt;
+      if (quadrantOwner != null) {
+        final playerColor = PlayerColors.getColor(quadrantOwner);
+        // Blend ~18% player color with the dark base for subtle tint
+        baseColor = Color.lerp(darkBase, playerColor, 0.18)!;
+      } else {
+        baseColor = darkBase;
+      }
     }
 
-    // Draw square background with subtle gradient
-    final squareGradient = ui.Gradient.linear(
-      Offset(x, y),
-      Offset(x + squareSize, y + squareSize),
-      [_lighten(baseColor, 8), baseColor, _darken(baseColor, 5)],
-      [0, 0.5, 1],
-    );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(5));
-    canvas.drawRRect(rrect, Paint()..shader = squareGradient);
+    // Draw square background — solid color, minimal radius for uniform grid
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+    canvas.drawRRect(rrect, Paint()..color = baseColor);
 
     // Square border
     final borderColor =
@@ -281,7 +244,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         Paint()
           ..color = borderColor
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0;
+          ..strokeWidth = 0.8;
     canvas.drawRRect(rrect, borderPaint);
 
     // Safe square — ornate X marker
@@ -289,11 +252,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       _drawSafeMarker(canvas, rect);
     }
 
-    // Starting position player indicator
-    final startPlayer = BoardConfig.getPlayerAtStart(pos);
-    if (startPlayer != null) {
-      _drawStartIndicator(canvas, rect, startPlayer);
-    }
+    // Starting position player indicator — removed for cleaner look
 
     // Full path glow for intermediate squares
     if (isOnPath && !isHighlighted) {
@@ -325,15 +284,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
             ) // Cream-white, high contrast on any player color
             : IstoColorsDark.safeSquareBorder;
 
-    // Faint inner glow
-    final glowPaint =
-        Paint()
-          ..shader = ui.Gradient.radial(rect.center, squareSize * 0.45, [
-            xColor.withValues(alpha: 0.15),
-            Colors.transparent,
-          ]);
-    canvas.drawRect(rect, glowPaint);
-
     // "X" cross mark — FULL SIZE corner-to-corner per spec §6
     // "drawn on top, suggesting engraving"
     final paint =
@@ -356,42 +306,10 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       paint,
     );
 
-    // Small diamond at center of X (engraved feel)
-    final cx = rect.center.dx;
-    final cy = rect.center.dy;
-    final d = squareSize * 0.08;
-    final diamondPath =
-        Path()
-          ..moveTo(cx, cy - d)
-          ..lineTo(cx + d, cy)
-          ..lineTo(cx, cy + d)
-          ..lineTo(cx - d, cy)
-          ..close();
-    canvas.drawPath(
-      diamondPath,
-      Paint()..color = xColor.withValues(alpha: 0.45),
-    );
+    // Diamond removed for cleaner look
   }
 
-  void _drawStartIndicator(Canvas canvas, Rect rect, int playerId) {
-    final color = PlayerColors.getColor(playerId);
-    final dotSize = squareSize * 0.07;
-
-    // Small colored dot in corner
-    canvas.drawCircle(
-      Offset(rect.right - dotSize * 2.5, rect.top + dotSize * 2.5),
-      dotSize,
-      Paint()..color = color.withValues(alpha: 0.6),
-    );
-    // Tiny glow
-    canvas.drawCircle(
-      Offset(rect.right - dotSize * 2.5, rect.top + dotSize * 2.5),
-      dotSize * 2,
-      Paint()
-        ..color = color.withValues(alpha: 0.1)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-    );
-  }
+  // _drawStartIndicator removed — cleaner look without dot
 
   void _drawPathSquareGlow(Canvas canvas, Rect rect) {
     // Subtle glow for squares on the movement path
@@ -401,7 +319,7 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     );
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(4)),
+      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(2)),
       Paint()
         ..color = playerColor.withValues(alpha: pulse * 0.25)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
@@ -410,24 +328,23 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
   void _drawHighlight(Canvas canvas, Rect rect, bool isKillTarget) {
     final pulse = (sin(_animTime * 4) * 0.3 + 0.7);
-    final color =
-        isKillTarget
-            ? ThemeConfig.dangerRed.withValues(alpha: 0.35 * pulse)
-            : ThemeConfig.successGreen.withValues(alpha: 0.3 * pulse);
+    // Use current player's color for move highlights, red for kills
+    final currentPlayerColor = PlayerColors.getColor(
+      gameManager.turnStateMachine.currentPlayerId,
+    );
+    final highlightColor = isKillTarget ? ThemeConfig.dangerRed : currentPlayerColor;
+    final color = highlightColor.withValues(alpha: (isKillTarget ? 0.35 : 0.3) * pulse);
 
     final highlightPaint = Paint()..color = color;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(5)),
+      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
       highlightPaint,
     );
 
     // Pulsing border
-    final borderColor =
-        isKillTarget
-            ? ThemeConfig.dangerRed.withValues(alpha: 0.8 * pulse)
-            : ThemeConfig.successGreen.withValues(alpha: 0.7 * pulse);
+    final borderColor = highlightColor.withValues(alpha: (isKillTarget ? 0.8 : 0.7) * pulse);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(5)),
+      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
       Paint()
         ..color = borderColor
         ..style = PaintingStyle.stroke
@@ -436,12 +353,9 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
     // Outer glow
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.inflate(2), const Radius.circular(7)),
+      RRect.fromRectAndRadius(rect.inflate(2), const Radius.circular(4)),
       Paint()
-        ..color = (isKillTarget
-                ? ThemeConfig.dangerRed
-                : ThemeConfig.successGreen)
-            .withValues(alpha: 0.15 * pulse)
+        ..color = highlightColor.withValues(alpha: 0.15 * pulse)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
   }
@@ -562,12 +476,15 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   };
 
   void _drawInnerEntryArrows(Canvas canvas) {
-    final playerCount = gameManager.playerCount;
-    for (int p = 0; p < playerCount; p++) {
+    // Always show all 4 inner entry arrows
+    final actualPlayerCount = gameManager.playerCount;
+    for (int p = 0; p < 4; p++) {
       final entry = _innerEntryPoints[p]!;
       final outerCell = entry[0];
       final innerCell = entry[1];
       final color = PlayerColors.getColor(p);
+      final isActivePlayer = p < actualPlayerCount;
+      final hasCaptured = isActivePlayer ? gameManager.hasPlayerCaptured(p) : false;
 
       // Get pixel centers of the two cells
       final fromX = outerCell[1] * (squareSize + _gap) + squareSize / 2;
@@ -590,29 +507,52 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       final endX = toX - nx * inset;
       final endY = toY - ny * inset;
 
-      // Pulsing alpha for subtle animation
-      final pulse = (sin(_animTime * 2.0 + p * 0.8) * 0.15 + 0.55).clamp(
-        0.3,
-        0.8,
-      );
+      // Visual state based on eligibility
+      final double baseAlpha;
+      if (!isActivePlayer) {
+        baseAlpha = 0.15; // Very dim for inactive players
+      } else if (hasCaptured) {
+        baseAlpha = 0.75; // Bright for eligible players
+      } else {
+        baseAlpha = 0.25; // Dim for players who haven't captured yet
+      }
 
-      // Arrow shaft (dashed effect with 3 segments)
+      // Pulsing alpha for subtle animation (only for eligible active players)
+      final pulse = hasCaptured && isActivePlayer
+          ? (sin(_animTime * 2.0 + p * 0.8) * 0.15 + 0.85).clamp(0.7, 1.0)
+          : 1.0;
+      final alpha = baseAlpha * pulse;
+
+      // Arrow shaft
       final shaftPaint =
           Paint()
-            ..color = color.withValues(alpha: pulse * 0.7)
-            ..strokeWidth = 2.0
+            ..color = color.withValues(alpha: alpha * 0.9)
+            ..strokeWidth = hasCaptured ? 2.2 : 1.5
             ..strokeCap = StrokeCap.round;
 
-      // Draw arrow line
-      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), shaftPaint);
+      if (!isActivePlayer || !hasCaptured) {
+        // Dashed line for locked/inactive arrows
+        for (int d = 0; d < 5; d += 2) {
+          final t1 = d / 5;
+          final t2 = (d + 1) / 5;
+          canvas.drawLine(
+            Offset(startX + (endX - startX) * t1, startY + (endY - startY) * t1),
+            Offset(startX + (endX - startX) * t2, startY + (endY - startY) * t2),
+            shaftPaint,
+          );
+        }
+      } else {
+        // Solid line for eligible arrows
+        canvas.drawLine(Offset(startX, startY), Offset(endX, endY), shaftPaint);
+      }
 
       // Arrowhead
       final headLen = squareSize * 0.18;
       final headAngle = 0.5; // ~28 degrees
       final arrowPaint =
           Paint()
-            ..color = color.withValues(alpha: pulse * 0.85)
-            ..strokeWidth = 2.2
+            ..color = color.withValues(alpha: alpha)
+            ..strokeWidth = hasCaptured ? 2.2 : 1.5
             ..strokeCap = StrokeCap.round
             ..style = PaintingStyle.stroke;
 
@@ -635,15 +575,39 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         arrowPaint,
       );
 
-      // Subtle glow behind arrow
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        Paint()
-          ..color = color.withValues(alpha: pulse * 0.15)
-          ..strokeWidth = 6.0
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-      );
+      // Lock indicator for ineligible active players
+      if (isActivePlayer && !hasCaptured) {
+        final lockX = (startX + endX) / 2;
+        final lockY = (startY + endY) / 2;
+        final lockSize = squareSize * 0.06;
+        final lockPaint =
+            Paint()
+              ..color = color.withValues(alpha: 0.4)
+              ..strokeWidth = 1.2
+              ..strokeCap = StrokeCap.round;
+        canvas.drawLine(
+          Offset(lockX - lockSize, lockY - lockSize),
+          Offset(lockX + lockSize, lockY + lockSize),
+          lockPaint,
+        );
+        canvas.drawLine(
+          Offset(lockX + lockSize, lockY - lockSize),
+          Offset(lockX - lockSize, lockY + lockSize),
+          lockPaint,
+        );
+      }
+
+      // Subtle glow behind arrow for eligible players
+      if (hasCaptured && isActivePlayer) {
+        canvas.drawLine(
+          Offset(startX, startY),
+          Offset(endX, endY),
+          Paint()
+            ..color = color.withValues(alpha: alpha * 0.15)
+            ..strokeWidth = 6.0
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        );
+      }
     }
   }
 
@@ -725,13 +689,15 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   // ========== HOME AREAS ==========
 
   void _drawHomeAreas(Canvas canvas) {
-    final playerCount = gameManager.playerCount;
-    for (int p = 0; p < playerCount; p++) {
-      _drawHomeArea(canvas, p, playerCount);
+    // Always draw all 4 home areas regardless of player count
+    for (int p = 0; p < 4; p++) {
+      _drawHomeArea(canvas, p, 4);
     }
   }
 
   void _drawHomeArea(Canvas canvas, int playerId, int playerCount) {
+    final actualPlayerCount = gameManager.playerCount;
+    final isActivePlayer = playerId < actualPlayerCount;
     final homeConfig = LayoutConfig.getHomePosition(
       playerId,
       playerCount,
@@ -742,51 +708,35 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     final rect = homeConfig.rect.translate(0, 0);
     final color = PlayerColors.getColor(playerId);
     final isCurrentPlayer =
+        isActivePlayer &&
         gameManager.turnStateMachine.currentPlayerId == playerId;
 
-    // Home area background — distinctly player-colored
-    final bgAlpha = isCurrentPlayer ? 0.40 : 0.25;
-    final bgPaint = Paint()..color = color.withValues(alpha: bgAlpha);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
-      bgPaint,
-    );
+    // Home area background — dimmed for inactive players
+    final double bgAlpha;
+    if (!isActivePlayer) {
+      bgAlpha = 0.15; // Dimmed for inactive players
+    } else if (isCurrentPlayer) {
+      bgAlpha = 0.55;
+    } else {
+      bgAlpha = 0.35;
+    }
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
 
-    // Inner gradient for depth
-    final innerGrad = ui.Gradient.linear(
-      Offset(rect.left, rect.top),
-      Offset(rect.left, rect.bottom),
-      [
-        color.withValues(alpha: bgAlpha * 0.5),
-        color.withValues(alpha: bgAlpha * 1.3),
-      ],
-    );
+    // Single solid fill — no dark base underneath (fixes black corners)
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
-      Paint()..shader = innerGrad,
-    );
-
-    // Dark base behind for contrast
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(9)),
-      Paint()..color = IstoColorsDark.bgPrimary.withValues(alpha: 0.35),
-    );
-    // Re-apply player color over the dark base
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(9)),
+      rrect,
       Paint()..color = color.withValues(alpha: bgAlpha),
     );
 
-    // Border — strong player color
+    // Border — dimmed for inactive
     final borderPaint =
         Paint()
-          ..color = color.withValues(alpha: isCurrentPlayer ? 0.75 : 0.45)
+          ..color = color.withValues(
+            alpha: !isActivePlayer ? 0.20 : (isCurrentPlayer ? 0.80 : 0.50),
+          )
           ..style = PaintingStyle.stroke
           ..strokeWidth = isCurrentPlayer ? 2.0 : 1.5;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(10)),
-      borderPaint,
-    );
+    canvas.drawRRect(rrect, borderPaint);
 
     // Active player glow
     if (isCurrentPlayer) {
@@ -799,31 +749,36 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       );
     }
 
-    // Draw home pawns
-    final homePawns = gameManager.pawnController.getHomePawnsForPlayer(
-      playerId,
-    );
-    final finishedCount =
-        gameManager.pawnController.getFinishedPawnsForPlayer(playerId).length;
-
-    for (int i = 0; i < 4; i++) {
-      final offset = LayoutConfig.getPawnHomeOffset(
+    // Only draw pawns and inner ring indicator for active players
+    if (isActivePlayer) {
+      // Draw home pawns
+      final homePawns = gameManager.pawnController.getHomePawnsForPlayer(
         playerId,
-        i,
-        playerCount,
-        _boardTotalSize,
-        pawnSize,
       );
+      final finishedCount =
+          gameManager.pawnController.getFinishedPawnsForPlayer(playerId).length;
 
-      if (i < homePawns.length) {
-        final pawn = homePawns[i];
-        final isHighlighted = _highlightedPawns.any((p) => p.id == pawn.id);
-        _drawHomePawn(canvas, offset.dx, offset.dy, pawn, isHighlighted);
-      } else if (i >= 4 - finishedCount) {
-        _drawFinishedStar(canvas, offset.dx, offset.dy, color);
-      } else {
-        _drawEmptySlot(canvas, offset.dx, offset.dy, color);
+      for (int i = 0; i < 4; i++) {
+        final offset = LayoutConfig.getPawnHomeOffset(
+          playerId,
+          i,
+          playerCount,
+          _boardTotalSize,
+          pawnSize,
+        );
+
+        if (i < homePawns.length) {
+          final pawn = homePawns[i];
+          final isHighlighted = _highlightedPawns.any((p) => p.id == pawn.id);
+          _drawHomePawn(canvas, offset.dx, offset.dy, pawn, isHighlighted);
+        } else if (i >= 4 - finishedCount) {
+          _drawFinishedStar(canvas, offset.dx, offset.dy, color);
+        } else {
+          _drawEmptySlot(canvas, offset.dx, offset.dy, color);
+        }
       }
+
+      // Inner ring eligibility indicator — shown on the entry arrows instead
     }
 
     // Player name label
@@ -969,8 +924,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
 
   // ========== PREMIUM PAWN RENDERING ==========
 
-  /// Draw a designed pawn disc — soft radial gradient, inner ring accent,
-  /// and subtle centre highlight. Refined but not overly 3D.
+  /// Draw a simple pawn disc — solid color with inner ring accent.
+  /// Clean and minimal with a subtle carved detail for character.
   void _drawPremiumPawn(
     Canvas canvas,
     double x,
@@ -981,52 +936,41 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }) {
     // Soft drop shadow for grounding
     canvas.drawCircle(
-      Offset(x, y + 1.5),
+      Offset(x, y + 1.2),
       radius + 0.5,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.30)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        ..color = Colors.black.withValues(alpha: 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
     );
 
-    // Soft radial gradient body — lighter centre fading to slightly
-    // darker edge. Gives depth without the harsh 3D look.
-    final bodyGradient = ui.Gradient.radial(
-      Offset(x - radius * 0.2, y - radius * 0.2), // offset for light angle
-      radius * 1.2,
-      [
-        _lighten(color, 22), // warm highlight centre
-        color, // true colour mid-zone
-        _darken(color, 18), // subtle shadow rim
-      ],
-      [0.0, 0.55, 1.0],
-    );
-    canvas.drawCircle(Offset(x, y), radius, Paint()..shader = bodyGradient);
+    // Solid flat body
+    canvas.drawCircle(Offset(x, y), radius, Paint()..color = color);
 
-    // Inner ring detail — subtle carved accent
+    // Subtle inner ring detail — carved accent for character
     canvas.drawCircle(
       Offset(x, y),
-      radius * 0.62,
+      radius * 0.58,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.14)
+        ..color = Colors.white.withValues(alpha: 0.18)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3,
+        ..strokeWidth = 1.2,
     );
 
-    // Outer border ring — clean edge definition
+    // Clean border ring
     canvas.drawCircle(
       Offset(x, y),
       radius,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.32)
+        ..color = Colors.white.withValues(alpha: 0.38)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
 
-    // Small centre highlight dot — subtle sparkle
+    // Tiny centre highlight dot — subtle sparkle
     canvas.drawCircle(
-      Offset(x - radius * 0.13, y - radius * 0.13),
-      radius * 0.09,
-      Paint()..color = Colors.white.withValues(alpha: 0.40),
+      Offset(x - radius * 0.12, y - radius * 0.12),
+      radius * 0.07,
+      Paint()..color = Colors.white.withValues(alpha: 0.35),
     );
   }
 
@@ -1180,18 +1124,22 @@ class BoardComponent extends PositionComponent with TapCallbacks {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
       );
 
-      // Translucent body
-      final bodyGradient = ui.Gradient.radial(
-        Offset(-radius * 0.2, -radius * 0.2),
-        radius * 1.2,
-        [
-          _lighten(color, 22).withValues(alpha: alpha),
-          color.withValues(alpha: alpha),
-          _darken(color, 18).withValues(alpha: alpha),
-        ],
-        [0.0, 0.55, 1.0],
+      // Translucent flat body
+      canvas.drawCircle(
+        Offset.zero,
+        radius,
+        Paint()..color = color.withValues(alpha: alpha),
       );
-      canvas.drawCircle(Offset.zero, radius, Paint()..shader = bodyGradient);
+
+      // Inner ring accent (matches live pawn style)
+      canvas.drawCircle(
+        Offset.zero,
+        radius * 0.58,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.12 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
+      );
 
       // Border
       canvas.drawCircle(
@@ -1231,17 +1179,29 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   /// Only the 4 edge-midpoint safe squares get player coloring (not center).
   int? _getHomeCellPlayer(int r, int c) {
     // Safe squares = start positions: P0=Bottom, P1=Top, P2=Left, P3=Right
-    final playerCount = gameManager.playerCount;
-    if (r == 4 && c == 2) return 0; // P0 start — Bottom (always active)
-    if (r == 0 && c == 2) {
-      return (playerCount >= 2) ? 1 : null; // P1 start — Top
-    }
-    if (r == 2 && c == 0) {
-      return (playerCount >= 3) ? 2 : null; // P2 start — Left
-    }
-    if (r == 2 && c == 4) {
-      return (playerCount >= 4) ? 3 : null; // P3 start — Right
-    }
+    // Always show all 4 player colors regardless of active player count
+    if (r == 4 && c == 2) return 0; // P0 start — Bottom
+    if (r == 0 && c == 2) return 1; // P1 start — Top
+    if (r == 2 && c == 0) return 2; // P2 start — Left
+    if (r == 2 && c == 4) return 3; // P3 start — Right
+    return null;
+  }
+
+  /// Map any outer-ring cell to the player whose quadrant it belongs to.
+  /// Each player "owns" the 4 cells in their path between their start
+  /// and the next corner (clockwise direction).
+  /// Returns playerId 0-3, or null for inner/center cells.
+  int? _getQuadrantOwner(int r, int c) {
+    // Inner ring + center don't belong to a quadrant
+    if (r >= 1 && r <= 3 && c >= 1 && c <= 3) return null;
+    // Bottom row: P0 (Flame)
+    if (r == 4) return 0;
+    // Top row: P1 (Emerald)
+    if (r == 0) return 1;
+    // Left column (excluding corners already claimed): P2 (Ocean)
+    if (c == 0) return 2;
+    // Right column: P3 (Gold)
+    if (c == 4) return 3;
     return null;
   }
 
@@ -1307,24 +1267,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       }
     }
     return false;
-  }
-
-  Color _lighten(Color color, int amount) {
-    return Color.fromARGB(
-      color.a.toInt(),
-      (color.r.toInt() + amount).clamp(0, 255),
-      (color.g.toInt() + amount).clamp(0, 255),
-      (color.b.toInt() + amount).clamp(0, 255),
-    );
-  }
-
-  Color _darken(Color color, int amount) {
-    return Color.fromARGB(
-      color.a.toInt(),
-      (color.r.toInt() - amount).clamp(0, 255),
-      (color.g.toInt() - amount).clamp(0, 255),
-      (color.b.toInt() - amount).clamp(0, 255),
-    );
   }
 
   // ========== TAP HANDLING ==========

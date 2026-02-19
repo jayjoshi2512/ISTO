@@ -4,7 +4,7 @@ import '../theme/isto_tokens.dart';
 import 'player_colors.dart';
 
 /// Theme configuration — colors, sizes, and player theming
-/// All colors derived from IstoColorsDark (Slate & Persimmon) tokens.
+/// All colors derived from IstoColorsDark (Navy & Flame) tokens.
 class ThemeConfig {
   // ======= BOARD COLORS =======
   static const Color boardBackground = IstoColorsDark.bgSurface;
@@ -13,21 +13,21 @@ class ThemeConfig {
   static const Color outerSquareBorder = IstoColorsDark.boardLine;
   static const Color innerSquare = IstoColorsDark.boardCellAlt;
   static const Color innerSquareBorder = IstoColorsDark.boardLine;
-  static const Color centerSquare = IstoColorsDark.accentGlow;
+  static const Color centerSquare = IstoColorsDark.centerHomeGlow;
   static const Color centerSquareGlow = IstoColorsDark.centerHomeGlow;
   static const Color safeSquareMark = IstoColorsDark.safeSquareBorder;
 
   // ======= COWRY COLORS =======
-  static const Color cowryUp = Color(0xFFF9F9F9); // Arctic White mouth-up
-  static const Color cowryDown = Color(0xFF5A5A5E); // Slate shell back
-  static const Color cowryBorder = Color(0xFF3B3B3D); // Slate Grey edge
+  static const Color cowryUp = Color(0xFFE8E7DF); // Cream mouth-up
+  static const Color cowryDown = Color(0xFF064DAC); // Navy shell back
+  static const Color cowryBorder = Color(0xFF032655); // Navy edge
 
   // ======= UI COLORS =======
   static const Color textPrimary = IstoColorsDark.textPrimary;
   static const Color textSecondary = IstoColorsDark.textSecondary;
   static const Color textMuted = IstoColorsDark.textMuted;
-  static const Color goldAccent = IstoColorsDark.accentPrimary;
-  static const Color goldDark = Color(0xFFCC4425);
+  static const Color goldAccent = IstoColorsDark.centerHomeGlow;
+  static const Color goldDark = Color(0xFF8A7800);
   static const Color dangerRed = IstoColorsDark.danger;
   static const Color successGreen = IstoColorsDark.success;
 

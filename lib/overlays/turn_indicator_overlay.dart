@@ -5,8 +5,9 @@ import '../config/theme_config.dart';
 import '../game/isto_game.dart';
 import '../theme/isto_tokens.dart';
 
-/// Top HUD bar — current player, last roll, pawn progress, settings.
-/// Slate & Persimmon palette, GoogleFonts Poppins.
+/// Top HUD bar — current player name, color indicator, pawn progress, settings.
+/// Navy & Flame palette, GoogleFonts Poppins.
+/// No roll number shown — clean player-centric design.
 class TurnIndicatorOverlay extends StatelessWidget {
   final ISTOGame game;
 
@@ -16,7 +17,6 @@ class TurnIndicatorOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final gm = game.gameManager;
     final player = gm.currentPlayer;
-    final roll = gm.cowryController.lastRoll;
     final isAI = gm.isCurrentPlayerAI;
 
     return Positioned(
@@ -27,48 +27,52 @@ class TurnIndicatorOverlay extends StatelessWidget {
         bottom: false,
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                player.color.withValues(alpha: 0.15),
-                IstoColorsDark.bgPrimary.withValues(alpha: 0.9),
-              ],
-            ),
+            color: IstoColorsDark.bgSurface,
             borderRadius: BorderRadius.circular(IstoRadius.md),
             border: Border.all(
-              color: player.color.withValues(alpha: 0.3),
-              width: 1,
+              color: player.color.withValues(alpha: 0.6),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: player.color.withValues(alpha: 0.2),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+            ],
           ),
           child: Row(
             children: [
-              // Player indicator dot with glow
+              // Player color indicator — glowing dot
               Container(
-                width: 14,
-                height: 14,
+                width: 16,
+                height: 16,
                 decoration: BoxDecoration(
                   color: player.color,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: player.color.withValues(alpha: 0.6),
-                      blurRadius: 8,
+                      color: player.color.withValues(alpha: 0.7),
+                      blurRadius: 10,
+                      spreadRadius: 2,
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
-              // Player name + AI badge
+              // Player name (prominent) + AI badge
               Expanded(
                 child: Row(
                   children: [
                     Text(
                       player.name,
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: IstoColorsDark.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: player.color,
+                        letterSpacing: 0.5,
                       ),
                     ),
                     if (isAI) ...[
@@ -79,14 +83,10 @@ class TurnIndicatorOverlay extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: IstoColorsDark.accentPrimary.withValues(
-                            alpha: 0.2,
-                          ),
+                          color: player.color.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: IstoColorsDark.accentPrimary.withValues(
-                              alpha: 0.3,
-                            ),
+                            color: player.color.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Text(
@@ -94,65 +94,46 @@ class TurnIndicatorOverlay extends StatelessWidget {
                           style: GoogleFonts.poppins(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            color: IstoColorsDark.accentPrimary,
+                            color: player.color,
                           ),
                         ),
                       ),
                     ],
+                    const Spacer(),
+                    // "YOUR TURN" / "AI TURN" label
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: player.color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isAI ? 'AI TURN' : 'YOUR TURN',
+                        style: GoogleFonts.poppins(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: player.color,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              // Last roll value chip
-              if (roll != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        roll.grantsExtraTurn
-                            ? IstoColorsDark.accentPrimary.withValues(
-                              alpha: 0.15,
-                            )
-                            : Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color:
-                          roll.grantsExtraTurn
-                              ? IstoColorsDark.accentPrimary.withValues(
-                                alpha: 0.3,
-                              )
-                              : Colors.white.withValues(alpha: 0.06),
-                    ),
-                  ),
-                  child: Text(
-                    '${roll.steps}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color:
-                          roll.grantsExtraTurn
-                              ? IstoColorsDark.accentPrimary
-                              : IstoColorsDark.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
               const SizedBox(width: 8),
               _buildPawnProgress(gm),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               // Settings gear
               GestureDetector(
                 onTap: () => game.overlays.add('settings'),
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: IstoColorsDark.bgElevated,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
                   ),
                   child: Icon(
                     Icons.settings_outlined,
@@ -171,6 +152,7 @@ class TurnIndicatorOverlay extends StatelessWidget {
   Widget _buildPawnProgress(dynamic gm) {
     final playerId = gm.turnStateMachine.currentPlayerId as int;
     final pawns = gm.pawnController.getPawnsForPlayer(playerId);
+    final playerColor = ThemeConfig.getPlayerColor(playerId);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(4, (i) {
@@ -184,17 +166,18 @@ class TurnIndicatorOverlay extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 isFinished
-                    ? IstoColorsDark
-                        .accentGlow // Gold for finished per spec §12
+                    ? IstoColorsDark.centerHomeGlow // Gold for finished
                     : isActive
-                    ? ThemeConfig.getPlayerColor(playerId)
+                    ? playerColor
                     : IstoColorsDark.textMuted.withValues(alpha: 0.3),
             shape: BoxShape.circle,
             boxShadow:
                 isFinished
                     ? [
                       BoxShadow(
-                        color: IstoColorsDark.accentGlow.withValues(alpha: 0.4),
+                        color: IstoColorsDark.centerHomeGlow.withValues(
+                          alpha: 0.5,
+                        ),
                         blurRadius: 4,
                       ),
                     ]

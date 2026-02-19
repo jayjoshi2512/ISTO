@@ -306,8 +306,9 @@ class _HowToPlayOverlayState extends State<HowToPlayOverlay>
                                     'enemy pair on the inner ring.',
                                   ),
                                   _bullet(
-                                    'Stacking is not allowed on the outer ring — '
-                                    'it is occupied by one pawn at a time.',
+                                    'On the outer ring, stacking is allowed on '
+                                    'safe squares (marked with X), but not on '
+                                    'regular outer squares.',
                                   ),
                                 ],
                               ),
@@ -582,7 +583,7 @@ class _HowToPlayOverlayState extends State<HowToPlayOverlay>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.12),
+                  color: IstoColorsDark.success.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -590,7 +591,7 @@ class _HowToPlayOverlayState extends State<HowToPlayOverlay>
                   style: GoogleFonts.poppins(
                     fontSize: 8,
                     fontWeight: FontWeight.w700,
-                    color: Colors.greenAccent,
+                    color: IstoColorsDark.safeSquareBorder,
                     letterSpacing: 0.5,
                   ),
                 ),

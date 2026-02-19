@@ -5,6 +5,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 import '../config/design_system.dart';
+import '../config/player_colors.dart';
 import '../models/models.dart';
 import '../components/components.dart';
 import '../services/feedback_service.dart';
@@ -23,6 +24,9 @@ class ISTOGame extends FlameGame with TapCallbacks {
   late double squareSize;
   late double boardSize;
   late double pawnSize;
+
+  /// Whether the layout uses a horizontal split (desktop/browser)
+  bool get isWideLayout => size.x >= 900;
 
   // Overlay identifiers
   static const String rollButtonOverlay = 'rollButton';
@@ -76,68 +80,107 @@ class ISTOGame extends FlameGame with TapCallbacks {
     _calculateSizes();
 
     final boardTotalSize = 5 * squareSize + 4 * 2;
-    final boardX = (size.x - boardTotalSize) / 2;
 
-    // Home areas in LayoutConfig use: height = boardTotalSize * 0.16, offset = 10
-    // Top areas sit at y = -(height+offset) relative to board origin
-    // Bottom areas sit at y = boardTotalSize + offset
-    final homeHeight = boardTotalSize * 0.16;
-    final homeOffset = 10.0;
-    // Label height above top home area (name text + gap)
-    final labelAboveHome = 16.0;
-    final spaceAboveBoard = labelAboveHome + homeHeight + homeOffset;
-    final spaceBelowBoard =
-        homeHeight + homeOffset + 16.0; // 16 for label below
+    if (isWideLayout) {
+      // ===== DESKTOP / BROWSER: horizontal split layout =====
+      // Left half: board + home areas + HUD
+      // Right half: cowry display (big)
+      final leftWidth = size.x * 0.50;
 
-    final hudHeight = 60.0;
-    final bottomPadding = 12.0;
-    final cowryZoneHeight = 100.0;
+      final boardX = (leftWidth - boardTotalSize) / 2;
 
-    // Total content from top to bottom:
-    final totalNeeded =
-        hudHeight +
-        4 +
-        spaceAboveBoard +
-        boardTotalSize +
-        spaceBelowBoard +
-        8 +
-        cowryZoneHeight +
-        bottomPadding;
+      // Vertical centering within left panel
+      final homeHeight = boardTotalSize * 0.16;
+      final homeOffset = 10.0;
+      final labelAboveHome = 16.0;
+      final spaceAboveBoard = labelAboveHome + homeHeight + homeOffset;
+      final spaceBelowBoard = homeHeight + homeOffset + 16.0;
+      final hudHeight = 60.0;
 
-    // Board Y: ensures top home labels clear HUD
-    double boardY;
-    if (totalNeeded <= size.y) {
-      final extra = size.y - totalNeeded;
-      boardY = hudHeight + 4 + spaceAboveBoard + extra * 0.25;
+      final contentHeight =
+          hudHeight + 4 + spaceAboveBoard + boardTotalSize + spaceBelowBoard;
+      final boardY = ((size.y - contentHeight) / 2).clamp(0.0, double.infinity) +
+          hudHeight +
+          4 +
+          spaceAboveBoard;
+
+      boardComponent = BoardComponent(
+        position: Vector2(boardX, boardY),
+        gameManager: gameManager,
+        squareSize: squareSize,
+        pawnSize: pawnSize,
+        onPawnTap: _onPawnTap,
+      );
+      add(boardComponent);
+
+      // Cowry in right half — large and vertically centred
+      final cowryWidth = (leftWidth - 40).clamp(200.0, 500.0);
+      final cowryHeight = (size.y * 0.55).clamp(200.0, 450.0);
+
+      cowryDisplayComponent = CowryDisplayComponent(
+        position: Vector2(leftWidth + (size.x - leftWidth) / 2, size.y / 2),
+        componentSize: Vector2(cowryWidth, cowryHeight),
+        onAnimationComplete: _onCowryAnimationDone,
+        onTap: _onCowryTap,
+      );
+      add(cowryDisplayComponent);
     } else {
-      boardY = hudHeight + 4 + spaceAboveBoard;
+      // ===== PORTRAIT / MOBILE: vertical layout =====
+      final boardX = (size.x - boardTotalSize) / 2;
+
+      final homeHeight = boardTotalSize * 0.16;
+      final homeOffset = 10.0;
+      final labelAboveHome = 16.0;
+      final spaceAboveBoard = labelAboveHome + homeHeight + homeOffset;
+      final spaceBelowBoard = homeHeight + homeOffset + 16.0;
+
+      final hudHeight = 60.0;
+      final bottomPadding = 12.0;
+      final cowryZoneHeight = 100.0;
+
+      final totalNeeded =
+          hudHeight +
+          4 +
+          spaceAboveBoard +
+          boardTotalSize +
+          spaceBelowBoard +
+          8 +
+          cowryZoneHeight +
+          bottomPadding;
+
+      double boardY;
+      if (totalNeeded <= size.y) {
+        final extra = size.y - totalNeeded;
+        boardY = hudHeight + 4 + spaceAboveBoard + extra * 0.25;
+      } else {
+        boardY = hudHeight + 4 + spaceAboveBoard;
+      }
+
+      final bottomHomesEnd =
+          boardY + boardTotalSize + homeOffset + homeHeight + 16;
+      final maxCowryHeight = 200.0;
+      final availableCowryHeight =
+          (size.y - bottomPadding - bottomHomesEnd).clamp(60.0, maxCowryHeight);
+      final cowryY = bottomHomesEnd + availableCowryHeight / 2;
+      final cowryWidth = (size.x - 16).clamp(0.0, 600.0);
+
+      boardComponent = BoardComponent(
+        position: Vector2(boardX, boardY),
+        gameManager: gameManager,
+        squareSize: squareSize,
+        pawnSize: pawnSize,
+        onPawnTap: _onPawnTap,
+      );
+      add(boardComponent);
+
+      cowryDisplayComponent = CowryDisplayComponent(
+        position: Vector2(size.x / 2, cowryY),
+        componentSize: Vector2(cowryWidth, availableCowryHeight),
+        onAnimationComplete: _onCowryAnimationDone,
+        onTap: _onCowryTap,
+      );
+      add(cowryDisplayComponent);
     }
-
-    // Bottom of the bottom home areas (including label)
-    final bottomHomesEnd =
-        boardY + boardTotalSize + homeOffset + homeHeight + 16;
-    // Cowry zone uses ALL available space below home areas
-    final availableCowryHeight = (size.y - bottomPadding - bottomHomesEnd)
-        .clamp(60.0, 200.0);
-    final cowryY = bottomHomesEnd + availableCowryHeight / 2;
-    final cowryWidth = size.x - 16; // Full width with small padding
-
-    boardComponent = BoardComponent(
-      position: Vector2(boardX, boardY),
-      gameManager: gameManager,
-      squareSize: squareSize,
-      pawnSize: pawnSize,
-      onPawnTap: _onPawnTap,
-    );
-    add(boardComponent);
-
-    cowryDisplayComponent = CowryDisplayComponent(
-      position: Vector2(size.x / 2, cowryY),
-      componentSize: Vector2(cowryWidth, availableCowryHeight),
-      onAnimationComplete: _onCowryAnimationDone,
-      onTap: _onCowryTap,
-    );
-    add(cowryDisplayComponent);
 
     _setupCallbacks();
     overlays.add(menuOverlay);
@@ -146,23 +189,32 @@ class ISTOGame extends FlameGame with TapCallbacks {
   void _calculateSizes() {
     final screenWidth = size.x;
     final screenHeight = size.y;
-    final availableWidth = screenWidth - 32;
-    // Reserve height for: HUD(60) + gap(8) + topHome + board + bottomHome + gap(12) + cowry(100) + padding(16)
-    // topHome + bottomHome = 2 * (board * 0.16 + 10)
-    // So total non-board = 60 + 8 + 2*(board*0.16+10) + 12 + 100 + 16 = 216 + 0.32*board
-    // board + 0.32*board = 1.32*board = screenHeight - 216
-    // board = (screenHeight - 216) / 1.32
-    // Account for: HUD(60) + gap(4) + labelAbove(16) + topHome(board*0.16+10) + board
-    // + bottomHome(board*0.16+10+16) + gap(8) + cowry(100) + padding(12)
-    // Non-board = 60+4+16+10+10+16+8+100+12 = 236 + 0.32*board
-    // 1.32*board = screenHeight - 236
-    final availableForBoard = (screenHeight - 236) / 1.32;
-    final boardArea =
-        availableWidth < availableForBoard ? availableWidth : availableForBoard;
 
-    squareSize = (boardArea - 8) / 5;
-    if (squareSize < 40) squareSize = 40;
-    if (squareSize > 80) squareSize = 80;
+    if (isWideLayout) {
+      // Desktop: board fits in left half
+      final leftWidth = screenWidth * 0.50;
+      final availableWidth = leftWidth - 48;
+      final availableForBoard = (screenHeight - 236) / 1.32;
+      final boardArea =
+          availableWidth < availableForBoard ? availableWidth : availableForBoard;
+      squareSize = (boardArea - 8) / 5;
+      final minSquare = 50.0;
+      final maxSquare = 130.0;
+      if (squareSize < minSquare) squareSize = minSquare;
+      if (squareSize > maxSquare) squareSize = maxSquare;
+    } else {
+      // Mobile / portrait
+      final availableWidth = screenWidth - 32;
+      final availableForBoard = (screenHeight - 236) / 1.32;
+      final boardArea =
+          availableWidth < availableForBoard ? availableWidth : availableForBoard;
+      squareSize = (boardArea - 8) / 5;
+      final minSquare = 40.0;
+      final maxSquare = 80.0;
+      if (squareSize < minSquare) squareSize = minSquare;
+      if (squareSize > maxSquare) squareSize = maxSquare;
+    }
+
     boardSize = squareSize * 5 + 8;
     pawnSize = squareSize * 0.5;
   }
@@ -238,6 +290,15 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
   void _onGameStateChanged() {
     boardComponent.updateDisplay();
+    // Sync cowry throw zone outline to current player's color
+    final pid = gameManager.turnStateMachine.currentPlayerId;
+    cowryDisplayComponent.currentPlayerColor = PlayerColors.getColor(pid);
+    // Force turn indicator overlay rebuild — it's StatelessWidget so
+    // remove + re-add is the only way to show fresh player/phase data.
+    if (overlays.isActive(turnIndicatorOverlay)) {
+      overlays.remove(turnIndicatorOverlay);
+      overlays.add(turnIndicatorOverlay);
+    }
   }
 
   void _onRollComplete(CowryRoll roll) {
@@ -246,24 +307,32 @@ class ISTOGame extends FlameGame with TapCallbacks {
         name: 'roll',
         run: (done) {
           cowryDisplayComponent.showRoll(roll);
-          // Sound fires at animation start
+          // Play roll sound at animation start for ALL rolls
+          _feedback.onRoll();
+          // Grace throw sound (ISTO/CHOWKA) will play AFTER animation completes
           if (roll.grantsExtraTurn) {
-            _feedback.onGraceThrow();
-          } else {
-            _feedback.onRoll();
+            // Additional haptic for grace rolls
+            _feedback.mediumTap();
           }
           // Cowry animation is ~1.3s. onCowryAnimationDone fires when it ends.
           // The queue event completes when cowry animation callback fires.
           _pendingRollDone = done;
+          _pendingRollForSound = roll;
         },
       ),
     );
   }
 
   VoidCallback? _pendingRollDone;
+  CowryRoll? _pendingRollForSound;
 
   /// Called when cowry roll animation finishes — now show highlights
   void _onCowryAnimationDone() {
+    // Play grace throw sound AFTER animation completes (synced with reveal)
+    if (_pendingRollForSound != null && _pendingRollForSound!.grantsExtraTurn) {
+      _feedback.onGraceThrow();
+    }
+    _pendingRollForSound = null;
     gameManager.onCowryAnimationComplete();
     // Complete the queued roll event
     final done = _pendingRollDone;
@@ -286,12 +355,14 @@ class ISTOGame extends FlameGame with TapCallbacks {
         final hopMs = hopCount <= 2 ? 360 : (hopCount <= 4 ? 315 : 265);
         final totalMs = hopCount * hopMs + 200; // +200ms landing settle
 
+        // Register animation IMMEDIATELY to prevent 1-frame flash at destination
+        boardComponent.animatePawnMove(pawn, fromIdx, toIdx);
+
         _enqueue(
           _GameEvent(
             name: 'pawnMove',
             run: (done) {
-              boardComponent.animatePawnMove(pawn, fromIdx, toIdx);
-              // Complete after animation duration
+              // Animation already started above — just wait for it to complete
               Future.delayed(Duration(milliseconds: totalMs), done);
             },
           ),
@@ -453,6 +524,9 @@ class ISTOGame extends FlameGame with TapCallbacks {
     if (!overlays.isActive(turnIndicatorOverlay)) {
       overlays.add(turnIndicatorOverlay);
     }
+    // Set initial cowry throw zone color
+    final pid = gameManager.turnStateMachine.currentPlayerId;
+    cowryDisplayComponent.currentPlayerColor = PlayerColors.getColor(pid);
   }
 
   void showMenu() {

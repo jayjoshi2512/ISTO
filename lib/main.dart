@@ -15,10 +15,12 @@ void main() async {
   // Initialize feedback service (haptics + audio)
   await feedbackService.initialize();
 
-  // Lock to portrait mode
+  // Allow all orientations — responsive layout handles landscape/desktop
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   // Set system UI to match bg-primary (Slate & Persimmon)
@@ -107,10 +109,27 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: GameWidget<ISTOGame>(
-        game: game,
-        overlayBuilderMap: {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // If exit dialog is already showing, dismiss it
+        if (game.overlays.isActive('exitDialog')) {
+          game.overlays.remove('exitDialog');
+          return;
+        }
+        // If menu is open, show exit confirmation
+        if (game.overlays.isActive(ISTOGame.menuOverlay)) {
+          _showMenuExitDialog(context);
+          return;
+        }
+        // Show exit confirmation dialog
+        game.overlays.add('exitDialog');
+      },
+      child: Scaffold(
+        body: GameWidget<ISTOGame>(
+          game: game,
+          overlayBuilderMap: {
           ISTOGame.turnIndicatorOverlay:
               (context, game) => TurnIndicatorOverlay(game: game),
           ISTOGame.winOverlay: (context, game) => WinOverlay(game: game),
@@ -127,12 +146,11 @@ class _GameScreenState extends State<GameScreen> {
           'noMoves': (context, game) => NoMovesOverlay(game: game),
           'settings': (context, game) => SettingsOverlay(game: game),
           'howToPlay': (context, game) => HowToPlayOverlay(game: game),
+          'exitDialog': (context, game) => ExitDialog(game: game),
         },
         loadingBuilder:
             (context) => Container(
-              decoration: const BoxDecoration(
-                gradient: DesignSystem.bgGradient,
-              ),
+              color: IstoColorsDark.bgPrimary,
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -154,9 +172,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
         errorBuilder:
             (context, error) => Container(
-              decoration: const BoxDecoration(
-                gradient: DesignSystem.bgGradient,
-              ),
+              color: IstoColorsDark.bgPrimary,
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(32),
@@ -186,6 +202,60 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
+        ),
+      ),
+    );
+  }
+
+  void _showMenuExitDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: IstoColorsDark.bgSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: IstoColorsDark.boardLine.withValues(alpha: 0.4),
+          ),
+        ),
+        title: Text(
+          'Exit ISTO?',
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: IstoColorsDark.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to exit?',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: IstoColorsDark.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Stay',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                color: IstoColorsDark.success,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: Text(
+              'Exit',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                color: IstoColorsDark.danger,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

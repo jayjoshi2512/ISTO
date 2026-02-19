@@ -43,7 +43,6 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _titleOpacity;
   late Animation<Offset> _titleSlide;
   late Animation<double> _subtitleOpacity;
-  late Animation<double> _taglineProgress; // 0→1 for letter-by-letter
   late Animation<double> _cowryScatterProgress; // 0→1 for 4 shells scatter
   late Animation<double> _particleBurst; // 0→1 for golden particles
   late Animation<double> _dustFloat; // 0→1 for floating sparkles
@@ -83,10 +82,10 @@ class _SplashScreenState extends State<SplashScreen>
       );
     });
 
-    // Master timeline: 0 → 6500ms
+    // Master timeline: 0 → 4500ms (shortened — no tagline)
     _masterCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 6500),
+      duration: const Duration(milliseconds: 4500),
     );
 
     // Exit fade: 500ms
@@ -105,39 +104,39 @@ class _SplashScreenState extends State<SplashScreen>
     _gridPatternOpacity = Tween<double>(begin: 0, end: 0.06).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.0, 0.09, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.10, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 2: Center bloom (0.09–0.18)
+    // Phase 2: Center bloom (0.10–0.22)
     _centerBloom = Tween<double>(begin: 0, end: 40).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.09, 0.18, curve: Curves.easeOut),
+        curve: const Interval(0.10, 0.22, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 3: Grid lines draw (0.14–0.27)
+    // Phase 3: Grid lines draw (0.16–0.32)
     _gridLinesDraw = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.14, 0.27, curve: Curves.decelerate),
+        curve: const Interval(0.16, 0.32, curve: Curves.decelerate),
       ),
     );
 
-    // Phase 4: Safe square pulse (0.27–0.36)
+    // Phase 4: Safe square pulse (0.30–0.42)
     _safeSquarePulse = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.27, 0.36, curve: Curves.easeOut),
+        curve: const Interval(0.30, 0.42, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 5: Title (0.28–0.42)
+    // Phase 5: Title "ISTO" (0.34–0.50)
     _titleOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.28, 0.42, curve: Curves.easeOutCubic),
+        curve: const Interval(0.34, 0.50, curve: Curves.easeOutCubic),
       ),
     );
     _titleSlide = Tween<Offset>(
@@ -146,47 +145,39 @@ class _SplashScreenState extends State<SplashScreen>
     ).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.28, 0.42, curve: Curves.easeOutCubic),
+        curve: const Interval(0.34, 0.50, curve: Curves.easeOutCubic),
       ),
     );
 
-    // Phase 6: Subtitle (0.36–0.48)
+    // Phase 6: Subtitle "Chowka Bara" (0.44–0.56)
     _subtitleOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.36, 0.48, curve: Curves.easeOut),
+        curve: const Interval(0.44, 0.56, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 7: Tagline letter-by-letter (0.40–0.60)
-    _taglineProgress = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _masterCtrl,
-        curve: const Interval(0.40, 0.60, curve: Curves.linear),
-      ),
-    );
-
-    // Phase 8: 4 cowry shells scatter from center (0.50–0.68)
+    // Phase 8: 4 cowry shells scatter from center (0.52–0.72)
     _cowryScatterProgress = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.50, 0.68, curve: Curves.easeOut),
+        curve: const Interval(0.52, 0.72, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 9: Golden particle burst (0.58–0.78)
+    // Phase 9: Golden particle burst (0.60–0.82)
     _particleBurst = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.58, 0.78, curve: Curves.easeOut),
+        curve: const Interval(0.60, 0.82, curve: Curves.easeOut),
       ),
     );
 
-    // Phase 10: Floating golden dust (0.55–1.0)
+    // Phase 10: Floating golden dust (0.58–1.0)
     _dustFloat = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _masterCtrl,
-        curve: const Interval(0.55, 1.0, curve: Curves.easeIn),
+        curve: const Interval(0.58, 1.0, curve: Curves.easeIn),
       ),
     );
 
@@ -195,7 +186,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _startSequence() async {
     _masterCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 7200));
+    await Future.delayed(const Duration(milliseconds: 5000));
     if (!mounted) return;
     _exitCtrl.forward();
     await Future.delayed(const Duration(milliseconds: 500));
@@ -278,11 +269,6 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-
-                      // Tagline with letter-by-letter reveal
-                      _buildTagline(),
-
                       const SizedBox(height: 24),
 
                       // 4 Cowry shells scatter animation
@@ -308,27 +294,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildTagline() {
-    const tagline = 'Traditional Indian Board Game';
-    final visibleChars = (_taglineProgress.value * tagline.length).floor();
-    if (visibleChars == 0) return const SizedBox(height: 18);
-
-    final visibleText = tagline.substring(0, visibleChars);
-    // Cursor blink when still typing
-    final showCursor = _taglineProgress.value < 1.0;
-    return SizedBox(
-      height: 18,
-      child: Text(
-        '$visibleText${showCursor ? '|' : ''}',
-        style: GoogleFonts.poppins(
-          fontSize: 13,
-          fontWeight: FontWeight.w400,
-          color: IstoColorsDark.textMuted.withValues(alpha: 0.7),
-          letterSpacing: 2.0,
-        ),
-      ),
-    );
-  }
 }
 
 // Data classes for pre-computed random scatter
@@ -375,19 +340,28 @@ class _SplashBoardPainter extends CustomPainter {
     final cellSize = size.width / 5;
     final center = Offset(size.width / 2, size.height / 2);
 
-    // Phase 1: Faint grid texture pattern
+    // Phase 1: Subtle board outline fading in
     if (gridPatternOpacity > 0) {
-      final patternPaint =
-          Paint()
-            ..color = IstoColorsDark.boardLine.withValues(
-              alpha: gridPatternOpacity,
-            )
-            ..strokeWidth = 0.5;
-      for (int i = 0; i <= 5; i++) {
-        final pos = i * cellSize;
-        canvas.drawLine(Offset(pos, 0), Offset(pos, size.height), patternPaint);
-        canvas.drawLine(Offset(0, pos), Offset(size.width, pos), patternPaint);
-      }
+      final outlineAlpha = (gridPatternOpacity / 0.06) * 0.15;
+      final boardRect = Rect.fromLTWH(0, 0, size.width, size.height);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(boardRect, const Radius.circular(4)),
+        Paint()
+          ..color = IstoColorsDark.boardLine.withValues(alpha: outlineAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+      // Subtle pulsing ring from center
+      final ringProgress = (gridPatternOpacity / 0.06);
+      final ringRadius = size.width * 0.15 * ringProgress;
+      canvas.drawCircle(
+        center,
+        ringRadius,
+        Paint()
+          ..color = IstoColorsDark.accentGlow.withValues(alpha: outlineAlpha * 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
+      );
     }
 
     // Phase 2: Center cell golden bloom
@@ -567,7 +541,7 @@ class _CowryScatterPainter extends CustomPainter {
         Offset(cx + cos(angle) * r, cy + sin(angle) * r),
         pSize,
         Paint()
-          ..color = const Color(0xFFD4A843).withValues(alpha: alpha)
+          ..color = IstoColorsDark.centerHomeGlow.withValues(alpha: alpha)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
     }
@@ -578,7 +552,7 @@ class _CowryScatterPainter extends CustomPainter {
       Offset(cx, cy),
       20 * particleBurst,
       Paint()
-        ..color = const Color(0xFFD4A843).withValues(alpha: glowAlpha)
+        ..color = IstoColorsDark.centerHomeGlow.withValues(alpha: glowAlpha)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
     );
   }
@@ -749,7 +723,7 @@ class _SparklesPainter extends CustomPainter {
       // Sparkle cross shape
       final sparkleSize = s.size * (0.5 + twinkle * 0.5);
       final paint =
-          Paint()..color = const Color(0xFFD4A843).withValues(alpha: alpha);
+          Paint()..color = IstoColorsDark.centerHomeGlow.withValues(alpha: alpha);
 
       canvas.drawCircle(Offset(x, y), sparkleSize * 0.5, paint);
       // Cross arms for sparkle effect

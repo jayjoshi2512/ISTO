@@ -4,7 +4,7 @@ import '../theme/isto_tokens.dart';
 
 /// Premium design system for ISTO — Chowka Bhara
 ///
-/// "Slate & Persimmon" — modern, high-contrast, professional board game aesthetic.
+/// "Navy & Flame" — deep navy with warm orange accents.
 /// Colors derived from IstoColorsDark tokens.
 class DesignSystem {
   // ========== CORE COLORS (mapped from IstoColorsDark) ==========
@@ -37,7 +37,7 @@ class DesignSystem {
   static const RadialGradient goldRadialGlow = RadialGradient(
     center: Alignment.center,
     radius: 0.8,
-    colors: [Color(0x40FF5733), Color(0x00FF5733)],
+    colors: [Color(0x40DB4E11), Color(0x00DB4E11)],
   );
 
   // ========== TYPOGRAPHY ==========
@@ -181,7 +181,7 @@ class DesignSystem {
     gradient:
         pressed
             ? const LinearGradient(
-              colors: [Color(0xFFCC4425), Color(0xFFFF5733)],
+              colors: [Color(0xFFA63B0D), Color(0xFFDB4E11)],
             )
             : goldGradient,
     borderRadius: BorderRadius.circular(radiusFull),
