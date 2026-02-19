@@ -22,6 +22,14 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   final double pawnSize;
   final Function(Pawn) onPawnTap;
 
+  /// When non-null, home areas are drawn at this absolute offset
+  /// (relative to this component's origin) in a 2×2 grid
+  /// instead of above/below the board. Used for desktop side-panel layout.
+  final Offset? sideHomesOffset;
+
+  /// Available width for the side homes panel (desktop only).
+  final double sideHomesWidth;
+
   // Highlighted pawns (valid moves)
   List<Pawn> _highlightedPawns = [];
 
@@ -48,7 +56,40 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     required this.squareSize,
     required this.pawnSize,
     required this.onPawnTap,
-  }) : super(position: position);
+    this.sideHomesOffset,
+    this.sideHomesWidth = 0,
+  }) : super(position: position) {
+    // Set size large enough to capture all taps.
+    if (sideHomesOffset != null) {
+      final rightEdge = sideHomesOffset!.dx + (sideHomesWidth > 0 ? sideHomesWidth : _boardTotalSize * 0.6) + 20;
+      size = Vector2(rightEdge, _boardTotalSize + 40);
+    } else {
+      final s = _boardTotalSize + 40;
+      size = Vector2(s, s + _boardTotalSize * 0.4);
+    }
+  }
+
+  /// Accept taps within the board grid area and home areas.
+  @override
+  bool containsPoint(Vector2 point) {
+    final margin = _boardTotalSize * 0.3;
+    if (point.x >= -margin &&
+        point.x <= _boardTotalSize + margin &&
+        point.y >= -margin &&
+        point.y <= _boardTotalSize + margin) {
+      return true;
+    }
+    if (sideHomesOffset != null) {
+      final homesRight = sideHomesOffset!.dx + (sideHomesWidth > 0 ? sideHomesWidth : _boardTotalSize * 0.6) + 10;
+      if (point.x >= sideHomesOffset!.dx - 10 &&
+          point.x <= homesRight &&
+          point.y >= -10 &&
+          point.y <= _boardTotalSize * 0.6) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   double get _boardTotalSize => 5 * squareSize + 4 * 2;
   double get _gap => 2.0;
@@ -196,7 +237,8 @@ class BoardComponent extends PositionComponent with TapCallbacks {
     // Safe/X-mark cells → owning player mapping (start positions)
     final homePlayerId = _getHomeCellPlayer(r, c);
 
-    // Square base color with player quadrant tinting
+    // Square base color — same visual weight as home/safe cells but
+    // neutral board tones.  Inner ring is visually distinct from outer.
     Color baseColor;
     if (isCenter) {
       baseColor = IstoColorsDark.centerHome;
@@ -204,29 +246,11 @@ class BoardComponent extends PositionComponent with TapCallbacks {
       // Safe square with X mark — full player background color
       baseColor = PlayerColors.getColor(homePlayerId);
     } else if (isInner) {
-      // Inner ring cells — subtle checkerboard with navy tones
-      baseColor =
-          (r + c) % 2 == 0
-              ? ThemeConfig.innerSquare
-              : Color.lerp(
-                ThemeConfig.innerSquare,
-                IstoColorsDark.boardCell,
-                0.3,
-              )!;
+      // Inner ring cells — slightly different shade for visual distinction
+      baseColor = IstoColorsDark.boardCellAlt;
     } else {
-      // Outer ring cells — tinted by player quadrant
-      final quadrantOwner = _getQuadrantOwner(r, c);
-      final darkBase =
-          (r + c) % 2 == 0
-              ? IstoColorsDark.boardCell
-              : IstoColorsDark.boardCellAlt;
-      if (quadrantOwner != null) {
-        final playerColor = PlayerColors.getColor(quadrantOwner);
-        // Blend ~18% player color with the dark base for subtle tint
-        baseColor = Color.lerp(darkBase, playerColor, 0.18)!;
-      } else {
-        baseColor = darkBase;
-      }
+      // Outer ring cells — solid medium-toned board blue
+      baseColor = IstoColorsDark.boardCell;
     }
 
     // Draw square background — solid color, minimal radius for uniform grid
@@ -689,10 +713,105 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   // ========== HOME AREAS ==========
 
   void _drawHomeAreas(Canvas canvas) {
-    // Always draw all 4 home areas regardless of player count
-    for (int p = 0; p < 4; p++) {
-      _drawHomeArea(canvas, p, 4);
+    if (sideHomesOffset != null) {
+      // Desktop side-panel mode: draw 4 homes in a vertical column
+      _drawSideHomeAreas(canvas);
+    } else {
+      // Mobile: draw homes above/below board
+      for (int p = 0; p < 4; p++) {
+        _drawHomeArea(canvas, p, 4);
+      }
     }
+  }
+
+  /// Draw home areas in a 2×2 grid at [sideHomesOffset].
+  /// Row 1: P0 (Flame), P1 (Emerald)  |  Row 2: P2 (Ocean), P3 (Gold)
+  void _drawSideHomeAreas(Canvas canvas) {
+    final ox = sideHomesOffset!.dx;
+    final oy = sideHomesOffset!.dy;
+    // Use available right-panel width (minus some padding)
+    final totalWidth = sideHomesWidth > 0 ? sideHomesWidth - 16 : _boardTotalSize * 0.55;
+    final hGap = 10.0;
+    final areaWidth = (totalWidth - hGap) / 2;
+    final areaHeight = _boardTotalSize * 0.16;
+    final vGap = 10.0;
+
+    // 2×2 grid: [P0, P1] / [P2, P3]
+    for (int playerId = 0; playerId < 4; playerId++) {
+      final col = playerId % 2;
+      final row = playerId ~/ 2;
+      final x = ox + col * (areaWidth + hGap);
+      final y = oy + row * (areaHeight + vGap + 18); // 18 for label below
+      final rect = Rect.fromLTWH(x, y, areaWidth, areaHeight);
+      _drawSideHomeArea(canvas, playerId, rect);
+    }
+  }
+
+  /// Draw a single home area at the given rect (side-panel mode).
+  void _drawSideHomeArea(Canvas canvas, int playerId, Rect rect) {
+    final actualPlayerCount = gameManager.playerCount;
+    final isActivePlayer = playerId < actualPlayerCount;
+    final color = PlayerColors.getColor(playerId);
+    final isCurrentPlayer =
+        isActivePlayer &&
+        gameManager.turnStateMachine.currentPlayerId == playerId;
+
+    final double bgAlpha;
+    if (!isActivePlayer) {
+      bgAlpha = 0.15;
+    } else if (isCurrentPlayer) {
+      bgAlpha = 0.55;
+    } else {
+      bgAlpha = 0.35;
+    }
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
+
+    canvas.drawRRect(rrect, Paint()..color = color.withValues(alpha: bgAlpha));
+
+    final borderPaint =
+        Paint()
+          ..color = color.withValues(
+            alpha: !isActivePlayer ? 0.20 : (isCurrentPlayer ? 0.80 : 0.50),
+          )
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isCurrentPlayer ? 2.0 : 1.5;
+    canvas.drawRRect(rrect, borderPaint);
+
+    if (isCurrentPlayer) {
+      final glowPulse = sin(_animTime * 3) * 0.12 + 0.22;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(3), const Radius.circular(12)),
+        Paint()
+          ..color = color.withValues(alpha: glowPulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+    }
+
+    if (isActivePlayer) {
+      final homePawns = gameManager.pawnController.getHomePawnsForPlayer(playerId);
+      final finishedCount =
+          gameManager.pawnController.getFinishedPawnsForPlayer(playerId).length;
+      final innerRect = rect.deflate(6);
+      final cellW = innerRect.width / 4;
+
+      for (int i = 0; i < 4; i++) {
+        final px = innerRect.left + cellW * i + cellW / 2;
+        final py = innerRect.center.dy;
+
+        if (i < homePawns.length) {
+          final pawn = homePawns[i];
+          final isHighlighted = _highlightedPawns.any((p) => p.id == pawn.id);
+          _drawHomePawn(canvas, px, py, pawn, isHighlighted);
+        } else if (i >= 4 - finishedCount) {
+          _drawFinishedStar(canvas, px, py, color);
+        } else {
+          _drawEmptySlot(canvas, px, py, color);
+        }
+      }
+    }
+
+    // Player name label below home area
+    _drawPlayerLabel(canvas, rect, playerId, isActivePlayer && isCurrentPlayer);
   }
 
   void _drawHomeArea(Canvas canvas, int playerId, int playerCount) {
@@ -1188,23 +1307,6 @@ class BoardComponent extends PositionComponent with TapCallbacks {
   }
 
   /// Map any outer-ring cell to the player whose quadrant it belongs to.
-  /// Each player "owns" the 4 cells in their path between their start
-  /// and the next corner (clockwise direction).
-  /// Returns playerId 0-3, or null for inner/center cells.
-  int? _getQuadrantOwner(int r, int c) {
-    // Inner ring + center don't belong to a quadrant
-    if (r >= 1 && r <= 3 && c >= 1 && c <= 3) return null;
-    // Bottom row: P0 (Flame)
-    if (r == 4) return 0;
-    // Top row: P1 (Emerald)
-    if (r == 0) return 1;
-    // Left column (excluding corners already claimed): P2 (Ocean)
-    if (c == 0) return 2;
-    // Right column: P3 (Gold)
-    if (c == 4) return 3;
-    return null;
-  }
-
   /// Check if a square is the DESTINATION for any highlighted pawn
   bool _isSquareHighlighted(int r, int c) {
     for (final pawn in _highlightedPawns) {
@@ -1308,13 +1410,36 @@ class BoardComponent extends PositionComponent with TapCallbacks {
         );
         for (int i = 0; i < homePawns.length; i++) {
           if (homePawns[i].id == pawn.id) {
-            final offset = LayoutConfig.getPawnHomeOffset(
-              pawn.playerId,
-              i,
-              gameManager.playerCount,
-              _boardTotalSize,
-              pawnSize,
-            );
+            Offset offset;
+            if (sideHomesOffset != null) {
+              // Side-panel 2×2 mode: compute offset from grid layout
+              final ox = sideHomesOffset!.dx;
+              final oy = sideHomesOffset!.dy;
+              final totalWidth = sideHomesWidth > 0 ? sideHomesWidth - 16 : _boardTotalSize * 0.55;
+              final hGap = 10.0;
+              final areaWidth = (totalWidth - hGap) / 2;
+              final areaHeight = _boardTotalSize * 0.16;
+              final vGap = 10.0;
+              final col = pawn.playerId % 2;
+              final row = pawn.playerId ~/ 2;
+              final rx = ox + col * (areaWidth + hGap);
+              final ry = oy + row * (areaHeight + vGap + 18);
+              final rect = Rect.fromLTWH(rx, ry, areaWidth, areaHeight);
+              final innerRect = rect.deflate(6);
+              final cellW = innerRect.width / 4;
+              offset = Offset(
+                innerRect.left + cellW * i + cellW / 2,
+                innerRect.center.dy,
+              );
+            } else {
+              offset = LayoutConfig.getPawnHomeOffset(
+                pawn.playerId,
+                i,
+                gameManager.playerCount,
+                _boardTotalSize,
+                pawnSize,
+              );
+            }
             if ((localPos - Vector2(offset.dx, offset.dy)).length <
                 pawnSize * 0.6) {
               onPawnTap(pawn);

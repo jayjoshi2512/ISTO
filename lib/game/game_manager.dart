@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../config/board_config.dart';
 import '../config/theme_config.dart';
 import '../models/models.dart';
 import '../controllers/controllers.dart';
@@ -323,7 +322,7 @@ class GameManager {
     onAIMove?.call(selectedPawn);
 
     final stacked = getStackedPawns(selectedPawn);
-    if (stacked.length > 1 && _canStackAtPawnPosition(selectedPawn)) {
+    if (stacked.length > 1 && isPawnOnInnerPath(selectedPawn)) {
       final count = aiController!.selectStackedPawnCount(
         stacked,
         roll.steps,
@@ -371,20 +370,6 @@ class GameManager {
     return pawn.currentPath == PathType.inner;
   }
 
-  /// Whether the pawn sits on an outer-ring safe square (i.e. a start cell
-  /// marked with X) where stacking is allowed.
-  bool _isPawnOnOuterSafeSquare(Pawn pawn) {
-    if (!pawn.isActive || pawn.isHome) return false;
-    if (pawn.currentPath != PathType.outer) return false;
-    final pos = pawnController.getPawnPosition(pawn);
-    if (pos == null) return false;
-    return BoardConfig.isSafeSquare(pos.toList());
-  }
-
-  /// Whether stacking is allowed at this pawn’s current position.
-  bool _canStackAtPawnPosition(Pawn pawn) {
-    return isPawnOnInnerPath(pawn) || _isPawnOnOuterSafeSquare(pawn);
-  }
 
   /// Select and move a pawn
   /// movePawnCount: 0 = not yet decided (show dialog if stacked)
@@ -439,7 +424,7 @@ class GameManager {
     // Only show when movePawnCount == 0 (not yet decided)
     final stackedPawns = getStackedPawns(pawn);
     if (stackedPawns.length > 1 &&
-        _canStackAtPawnPosition(pawn) &&
+        isPawnOnInnerPath(pawn) &&
         movePawnCount == 0 &&
         !isCurrentPlayerAI) {
       // Check if a single-pawn full-step move is even possible

@@ -83,26 +83,20 @@ class ISTOGame extends FlameGame with TapCallbacks {
 
     if (isWideLayout) {
       // ===== DESKTOP / BROWSER: horizontal split layout =====
-      // Left half: board + home areas + HUD
-      // Right half: cowry display (big)
-      final leftWidth = size.x * 0.50;
-
-      final boardX = (leftWidth - boardTotalSize) / 2;
-
-      // Vertical centering within left panel
-      final homeHeight = boardTotalSize * 0.16;
-      final homeOffset = 10.0;
-      final labelAboveHome = 16.0;
-      final spaceAboveBoard = labelAboveHome + homeHeight + homeOffset;
-      final spaceBelowBoard = homeHeight + homeOffset + 16.0;
+      // Left ~55%: Board only (no home areas) — can be bigger
+      // Right ~45%: Player homes (2×2 grid) + cowry display below
       final hudHeight = 60.0;
+      final leftWidth = size.x * 0.55;
 
-      final contentHeight =
-          hudHeight + 4 + spaceAboveBoard + boardTotalSize + spaceBelowBoard;
-      final boardY = ((size.y - contentHeight) / 2).clamp(0.0, double.infinity) +
-          hudHeight +
-          4 +
-          spaceAboveBoard;
+      // Board fills the left panel
+      final boardX = (leftWidth - boardTotalSize) / 2;
+      final boardY = hudHeight + (size.y - hudHeight - boardTotalSize) / 2;
+
+      // Home areas: 2×2 grid to the right of the board
+      final sideHomesX = boardTotalSize + 20;
+      final sideHomesY = 0.0;
+      // Available width from homes start to screen right edge
+      final rightPanelWidth = size.x - boardX - boardTotalSize - 20;
 
       boardComponent = BoardComponent(
         position: Vector2(boardX, boardY),
@@ -110,16 +104,24 @@ class ISTOGame extends FlameGame with TapCallbacks {
         squareSize: squareSize,
         pawnSize: pawnSize,
         onPawnTap: _onPawnTap,
+        sideHomesOffset: Offset(sideHomesX, sideHomesY),
+        sideHomesWidth: rightPanelWidth,
       );
       add(boardComponent);
 
-      // Cowry in right half — large and vertically centred
-      final cowryWidth = (leftWidth - 40).clamp(200.0, 500.0);
-      final cowryHeight = (size.y * 0.55).clamp(200.0, 450.0);
+      // Cowry below the 2×2 homes grid
+      // 2×2 grid height: 2 rows × (areaHeight + vGap + labelHeight)
+      final areaHeight = boardTotalSize * 0.16;
+      final homeGridHeight = 2 * (areaHeight + 10 + 18) + 16; // 2 rows + padding
+      final cowryTopY = boardY + homeGridHeight;
+      final cowryAvailHeight = (size.y - cowryTopY - 16).clamp(120.0, 450.0);
+      // Cowry centered in the right panel
+      final rightCenterX = boardX + boardTotalSize + 20 + rightPanelWidth / 2;
+      final cowryWidth = (rightPanelWidth - 32).clamp(200.0, 500.0);
 
       cowryDisplayComponent = CowryDisplayComponent(
-        position: Vector2(leftWidth + (size.x - leftWidth) / 2, size.y / 2),
-        componentSize: Vector2(cowryWidth, cowryHeight),
+        position: Vector2(rightCenterX, cowryTopY + cowryAvailHeight / 2),
+        componentSize: Vector2(cowryWidth, cowryAvailHeight),
         onAnimationComplete: _onCowryAnimationDone,
         onTap: _onCowryTap,
       );
@@ -191,15 +193,16 @@ class ISTOGame extends FlameGame with TapCallbacks {
     final screenHeight = size.y;
 
     if (isWideLayout) {
-      // Desktop: board fits in left half
-      final leftWidth = screenWidth * 0.50;
+      // Desktop: board fills left 55% — no home areas using vertical space
+      final leftWidth = screenWidth * 0.55;
       final availableWidth = leftWidth - 48;
-      final availableForBoard = (screenHeight - 236) / 1.32;
+      final hudHeight = 60.0;
+      final availableHeight = screenHeight - hudHeight - 32; // HUD + padding
       final boardArea =
-          availableWidth < availableForBoard ? availableWidth : availableForBoard;
+          availableWidth < availableHeight ? availableWidth : availableHeight;
       squareSize = (boardArea - 8) / 5;
-      final minSquare = 50.0;
-      final maxSquare = 130.0;
+      final minSquare = 60.0;
+      final maxSquare = 150.0;
       if (squareSize < minSquare) squareSize = minSquare;
       if (squareSize > maxSquare) squareSize = maxSquare;
     } else {

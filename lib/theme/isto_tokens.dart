@@ -22,8 +22,8 @@ class IstoColorsDark {
   static const Color bgElevated = Color(0xFF043D89);
 
   // Board — Navy tones
-  static const Color boardCell = Color(0xFF032E67);
-  static const Color boardCellAlt = Color(0xFF022450);
+  static const Color boardCell = Color(0xFF1A4A7A);
+  static const Color boardCellAlt = Color(0xFF143B5E);
   static const Color boardLine = Color(0xFF064DAC);
   static const Color boardOuterBorder = Color(0xFF075CCE);
 

@@ -306,9 +306,9 @@ class _HowToPlayOverlayState extends State<HowToPlayOverlay>
                                     'enemy pair on the inner ring.',
                                   ),
                                   _bullet(
-                                    'On the outer ring, stacking is allowed on '
-                                    'safe squares (marked with X), but not on '
-                                    'regular outer squares.',
+                                    'On the outer ring, multiple pawns may rest on '
+                                    'safe squares (marked with X), but they move '
+                                    'independently — not as a stack.',
                                   ),
                                 ],
                               ),
